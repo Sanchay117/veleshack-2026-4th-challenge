@@ -1,16 +1,30 @@
 """
 The agent main loop.
 
-THIS FILE IS GIVEN TO YOU AND IT WORKS. Out of the box it registers, keeps its
-lease alive, submits a bid every round, reads back the result, and survives the
-faults the graded arena throws at it.
+Built on the template's loop, which already registers, keeps its lease alive
+on its own thread, bids before doing any bookkeeping, and survives the faults
+the graded arena throws at it. Three additions:
 
-You are not expected to change it. The challenge lives in strategy.py.
+* Every round, before deciding, it reads `/v1/swarm` - who is in the swarm and
+  how much charge each node has - and feeds it to the strategist together
+  with the round. It does this on rounds it sits out too, so the opponent
+  model never loses track. `/v1/swarm` is exempt from fault injection; if it
+  fails anyway the strategist falls back to estimating the field from prices.
+* The decision itself goes to `strategy.Strategist` with the run length and
+  round number, which the template signature does not carry.
+* One log line per round says what was decided and why, and an optional
+  telemetry server (`TELEMETRY_PORT`) feeds the live dashboard.
 
 Run it:
     ARENA_URL=http://localhost:8080 TEAM_NAME=team-kappa python agent.py
 
-Copyright 2026 The CoGNETs Consortium
+Configuration is environment only:
+    ARENA_URL        arena base URL                    (default http://localhost:8080)
+    TEAM_NAME        your team; decides your device     (default unnamed-team)
+    LOG_LEVEL        DEBUG / INFO / WARNING             (default INFO)
+    TELEMETRY_PORT   serve the dashboard on this port   (default off)
+
+Copyright 2026 The CoGNETs Consortium, Sanchay Singh
 SPDX-License-Identifier: Apache-2.0
 """
 
@@ -21,7 +35,6 @@ import os
 import signal
 import sys
 import threading
-import time
 from typing import Any, Dict, List, Optional
 
 from client import (
@@ -34,12 +47,14 @@ from client import (
     RoundClosed,
     WrongRound,
 )
-from strategy import decide_bid
+from strategy import BRAIN, safe_bid
+from telemetry import Telemetry, serve
 
 LOG = logging.getLogger("agent")
 
 ARENA_URL = os.environ.get("ARENA_URL", "http://localhost:8080")
 TEAM_NAME = os.environ.get("TEAM_NAME", "unnamed-team")
+TELEMETRY_PORT = os.environ.get("TELEMETRY_PORT", "").strip()
 
 _stop = threading.Event()
 
@@ -52,8 +67,7 @@ def heartbeat_loop(client: ArenaClient, interval: float) -> None:
 
     Deliberately a separate thread. If you heartbeat only inside the bidding
     loop, then one slow round - or one round you sit out because your battery
-    is flat - lets your lease expire, and you silently stop being scored. This
-    is the single most common way teams lose points.
+    is flat - lets your lease expire, and you silently stop being scored.
     """
     LOG.info("heartbeat every %.1fs", interval)
     while not _stop.is_set():
@@ -72,6 +86,10 @@ def heartbeat_loop(client: ArenaClient, interval: float) -> None:
 # ---------------------------------------------------------------------------
 def run() -> int:
     client = ArenaClient(ARENA_URL, TEAM_NAME)
+    telemetry: Optional[Telemetry] = None
+    if TELEMETRY_PORT:
+        telemetry = Telemetry(TEAM_NAME)
+        serve(telemetry, int(TELEMETRY_PORT))
 
     LOG.info("connecting to %s as '%s'", ARENA_URL, TEAM_NAME)
     if not client.wait_for_arena(timeout=90.0):
@@ -82,6 +100,9 @@ def run() -> int:
 
     lease = float(client.arena_info.get("lease_seconds", 12.0))
     total_rounds = int(client.arena_info.get("total_rounds", 0))
+    cutoff = client.arena_info.get("battery_cutoff")
+    if cutoff is not None:
+        BRAIN.market.physics.cutoff = float(cutoff)
     hb = threading.Thread(
         target=heartbeat_loop, args=(client, max(1.0, lease / 3.0)), daemon=True
     )
@@ -90,6 +111,7 @@ def run() -> int:
     history: List[Dict[str, Any]] = []
     last_bid_round = 0
     last_result_round = 0
+    last_seen_round = 0
     idle_polls = 0
 
     while not _stop.is_set():
@@ -114,26 +136,35 @@ def run() -> int:
         round_index = int(rnd["round"])
 
         # ------------------------------------------------------ fresh arena?
-        # A restarted arena counts from round 1 again. Everything below is keyed
-        # off the round number, and `history` describes a run that no longer
-        # exists, so both are dropped when the counter goes backwards. If you
-        # write your own loop, keep this - without it an agent sits out every
-        # round of the new run up to the number the old one reached.
-        if round_index < last_bid_round:
+        # A restarted arena counts from round 1 again. Everything keyed off
+        # the round number, the history, and the strategist's model of the
+        # swarm describe a run that no longer exists, so all of it is dropped.
+        if round_index < max(last_bid_round, last_seen_round):
             LOG.info(
                 "round counter went backwards (%d -> %d): a new run has "
                 "started on this arena, resetting per-run state",
-                last_bid_round,
+                max(last_bid_round, last_seen_round),
                 round_index,
             )
-            last_bid_round = 0
-            last_result_round = 0
+            last_bid_round = last_result_round = last_seen_round = 0
             history.clear()
+            BRAIN.reset()
+            if cutoff is not None:
+                BRAIN.market.physics.cutoff = float(cutoff)
+            if telemetry:
+                telemetry.reset()
+
+        # -------------------------------------------------- observe the swarm
+        # Once per round, as early as possible: who is awake, how much charge
+        # each node has. Cheap (one fault-exempt GET) and done even on rounds
+        # we sit out, so the opponent model never loses the thread.
+        if round_index != last_seen_round and not rnd.get("settled"):
+            last_seen_round = round_index
+            _observe(client, rnd, telemetry)
 
         # ----------------------------------------------------- already done?
         # Bidding comes BEFORE fetching the previous result. Reading results is
-        # bookkeeping; missing the bidding window is a lost round. Never put
-        # anything that can block in front of the bid.
+        # bookkeeping; missing the bidding window is a lost round.
         if round_index <= last_bid_round or rnd.get("settled"):
             _collect_result(client, history, last_bid_round, last_result_round)
             last_result_round = max(last_result_round,
@@ -146,8 +177,11 @@ def run() -> int:
             last_bid_round = round_index
             continue
         if you.get("admissible") is False:
-            LOG.info("round %d: not admissible (resting), sitting it out",
-                     round_index)
+            LOG.info("round %d: resting (battery %.3f), sitting it out",
+                     round_index, float(you.get("battery", 0.0)))
+            BRAIN.note_rest(rnd)
+            if telemetry:
+                telemetry.on_decision(BRAIN.last)
             last_bid_round = round_index
             _stop.wait(0.4)
             continue
@@ -155,32 +189,25 @@ def run() -> int:
         # ------------------------------------------------------------- decide
         budget = float(rnd.get("budget", 0.0))
         try:
-            bid = decide_bid(
-                budget=budget,
-                prices=rnd.get("prices", {}),
-                capacities=rnd.get("capacities", {}),
-                profile=client.profile,
-                history=history,
-            )
+            bid = BRAIN.decide(rnd, client.profile, history, total_rounds)
+            _log_decision(BRAIN.last)
+            if telemetry:
+                telemetry.on_decision(BRAIN.last)
         except Exception:
-            # A crash in your strategy must never kill the agent. Falling back
-            # to a weight-proportional bid costs you a little score; crashing
-            # costs you the whole run.
-            LOG.exception("strategy raised; falling back to a proportional bid")
-            weights = client.profile.get("weights", {})
-            bid = {k: budget * float(weights.get(k, 1 / 3)) for k in
-                   ("compute", "energy", "security")}
+            # A crash in the strategy must never kill the agent. The safe bid
+            # costs a little score; crashing costs the whole run.
+            LOG.exception("strategy raised; falling back to the safe bid")
+            bid = safe_bid(budget, client.profile)
 
         bid = _sanitise(bid, budget)
 
         # ---------------------------------------------------------------- bid
         try:
-            ack = client.post_bid(round_index, bid)
+            ack = client.post_bid(round_index, bid, deadline=rnd.get("_deadline"))
             last_bid_round = round_index
             if ack.get("warnings"):
                 LOG.warning("round %d accepted with warnings: %s",
                             round_index, ack["warnings"])
-            LOG.debug("round %d bid %s", round_index, _fmt_bundle(bid))
         except AlreadyBid:
             last_bid_round = round_index
         except (RoundClosed, WrongRound) as exc:
@@ -202,15 +229,18 @@ def run() -> int:
             try:
                 final = client.me()
                 LOG.info(
-                    "FINAL  score=%.3f  rounds=%d  missed=%d  floors=%d  kappa=%.2f",
+                    "FINAL  score=%.3f  rounds=%d  idle=%d  missed=%d  floors=%d  kappa=%.2f",
                     final.get("score", 0.0),
                     final.get("rounds_participated", 0),
+                    final.get("rounds_idle", 0),
                     final.get("rounds_missed", 0),
                     final.get("floor_violations", 0),
                     final.get("compromise", 0.0),
                 )
             except ArenaClientError:
                 pass
+            if telemetry:
+                _observe_board(client, total_rounds + 1, telemetry)
             break
 
         _stop.wait(0.25)
@@ -222,6 +252,43 @@ def run() -> int:
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+def _observe(client: ArenaClient, rnd: Dict[str, Any],
+             telemetry: Optional[Telemetry]) -> None:
+    """Snapshot the swarm for this round and hand it to the strategist."""
+    swarm = None
+    try:
+        swarm = client.swarm().get("nodes")
+    except ArenaClientError as exc:
+        LOG.warning("round %s: no swarm snapshot (%s); estimating from prices",
+                    rnd.get("round"), exc)
+    try:
+        BRAIN.observe(rnd, swarm, client.node_id)
+    except Exception:
+        LOG.exception("strategist could not digest round %s", rnd.get("round"))
+    if telemetry:
+        _observe_board(client, int(rnd["round"]), telemetry)
+
+
+def _observe_board(client: ArenaClient, round_index: int, telemetry: Telemetry) -> None:
+    try:
+        telemetry.on_board(round_index, client.leaderboard())
+    except ArenaClientError:
+        pass
+
+
+def _log_decision(d: Dict[str, Any]) -> None:
+    bid = d.get("bid", {})
+    LOG.info(
+        "round %d  battery=%.3f  awake=%d  bid=C%.3f/E%.3f/S%.3f  x_E=%.3f  "
+        "exp_u=%.3f  shadow=%.2f  model=%s(err %.4f)  %.0fms",
+        d.get("round", 0), d.get("battery", 0.0), len(d.get("awake", [])),
+        bid.get("compute", 0.0), bid.get("energy", 0.0), bid.get("security", 0.0),
+        d.get("x_energy", 0.0), d.get("expected_utility", 0.0),
+        d.get("shadow_price", 0.0), d.get("model", "?"), d.get("model_error", 0.0),
+        d.get("think_ms", 0.0),
+    )
+
+
 def _collect_result(client: ArenaClient, history: List[Dict[str, Any]],
                     last_bid_round: int, last_result_round: int) -> None:
     """Pull the last settled result into history. Best-effort, never blocking."""
@@ -237,10 +304,8 @@ def _collect_result(client: ArenaClient, history: List[Dict[str, Any]],
         return
     history.append(result)
     LOG.info(
-        "round %d  spend=%.3f  alloc=%s  utility=%.4f%s  battery=%.2f  total=%.3f",
+        "round %d  result  utility=%.4f%s  battery=%.3f  total=%.3f",
         result["round"],
-        result.get("spend", 0.0),
-        _fmt_bundle(result.get("allocation", {})),
         result.get("utility", 0.0),
         _fmt_violations(result.get("floor_violations")),
         result.get("battery", 0.0),
@@ -257,7 +322,7 @@ def _sanitise(bid: Any, budget: float) -> Dict[str, float]:
 
     The arena raises your compromise score for negative, non-numeric or
     over-budget bids, and ejects you if it happens often enough. Clamping here
-    means a strategy bug costs you score rather than the run.
+    means a strategy bug costs score rather than the run.
     """
     resources = ("compute", "energy", "security")
     clean: Dict[str, float] = {}
@@ -276,10 +341,6 @@ def _sanitise(bid: Any, budget: float) -> Dict[str, float]:
     return clean
 
 
-def _fmt_bundle(bundle: Dict[str, float]) -> str:
-    return " ".join(f"{k[:3]}={float(v):.3f}" for k, v in sorted(bundle.items()))
-
-
 def _fmt_violations(violations: Optional[List[str]]) -> str:
     return f"  MISSED:{','.join(violations)}" if violations else ""
 
@@ -296,6 +357,9 @@ def main() -> int:
         datefmt="%H:%M:%S",
         stream=sys.stdout,
     )
+    # One line per request drowns the decision log; keep it for DEBUG only.
+    if logging.getLogger().level > logging.DEBUG:
+        logging.getLogger("httpx").setLevel(logging.WARNING)
     signal.signal(signal.SIGTERM, _handle_signal)
     signal.signal(signal.SIGINT, _handle_signal)
     try:
