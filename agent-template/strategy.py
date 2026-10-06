@@ -36,7 +36,8 @@ import numpy as np
 
 from econ import RESOURCES
 from opponents import Market, clamp
-from planner import ENERGY_FRACTIONS, Device, Market1, Plan, plan, round_menu
+from planner import (ENERGY_FRACTIONS, Device, Market1, Menu, Plan, plan, round_menu,
+                     value)
 
 LOG = logging.getLogger("agent.strategy")
 
@@ -47,16 +48,35 @@ PLAN_ITERATIONS = 3
 #: The default energy spend assumed for ourselves before a plan exists.
 DEFAULT_ACTION = int(np.searchsorted(ENERGY_FRACTIONS, 0.03))
 
+#: Seconds of thinking after which optional refinement passes are skipped.
+#: The graded round is 4 s and the bid may meet 250 ms of latency plus retries,
+#: so the first full plan (~50-150 ms) is always made and extras must fit.
+THINK_BUDGET = 0.6
+
+#: Spread of the capacity draws used when planning over sampled futures
+#: (the published scenarios draw each pool uniformly within +-30%).
+CAPACITY_JITTER = 0.30
+
 #: Value of one unit of charge when the planner is switched off (ablation only).
 FIXED_SHADOW_PRICE = 1.0
+
+#: How far above a service floor to aim. With the field known exactly the only
+#: error left is the arena's six-decimal rounding, so a sliver is enough; the
+#: margin grows with the model's measured error. Without the model the field
+#: is a one-round-stale estimate and needs the bots' 20%.
+MIN_FLOOR_MARGIN = 0.003
+EMPIRICAL_FLOOR_MARGIN = 0.20
 
 
 class Strategist:
     """Stateful decision-maker. One per agent process, reset per run."""
 
-    def __init__(self, use_opponent_model: bool = True, use_planner: bool = True) -> None:
+    def __init__(self, use_opponent_model: bool = True, use_planner: bool = True,
+                 lookahead: int = 0, scenarios: int = 1) -> None:
         self.use_opponent_model = use_opponent_model
         self.use_planner = use_planner
+        self.lookahead = lookahead
+        self.scenarios = scenarios
         self.reset()
 
     def reset(self) -> None:
@@ -124,7 +144,8 @@ class Strategist:
 
         modelled = r in self.fields
         field_now = self.fields[r] if modelled else empirical_field(history, payload)
-        margin = (min(0.25, max(0.003, 4.0 * self.market.accuracy)) if modelled else 0.20)
+        margin = (min(0.25, max(MIN_FLOOR_MARGIN, 4.0 * self.market.accuracy)) if modelled
+                  else EMPIRICAL_FLOOR_MARGIN)
 
         now = Market1(budget=budget, capacities=caps, field=field_now)
         menu_now = round_menu(now, dev, phys.drain, phys.idle, margin)
@@ -133,7 +154,9 @@ class Strategist:
         forecast_awake: List[List[str]] = []
         if self.use_planner and horizon > 1:
             actions = self._prior_actions(r, horizon)
-            for _ in range(PLAN_ITERATIONS):
+            for i in range(PLAN_ITERATIONS):
+                if i and time.perf_counter() - t0 > THINK_BUDGET:
+                    break   # a good plan now beats a perfect one after the round closes
                 futures, forecast_awake = (
                     self._forecast(r, horizon, actions, dev, battery, now) if modelled
                     else ([now] * (horizon - 1), []))
@@ -143,9 +166,25 @@ class Strategist:
                 if p.action_path == actions:
                     break
                 actions = p.action_path
+            if self.scenarios > 1 and modelled and time.perf_counter() - t0 < THINK_BUDGET / 2:
+                # Plan against the average of several sampled futures instead of
+                # the single mean one: the bots' naps shift with the pool sizes.
+                rng = np.random.default_rng(r)
+                runs = []
+                for _ in range(self.scenarios):
+                    fut, _aw = self._forecast(r, horizon, p.action_path, dev, battery, now, rng)
+                    runs.append([round_menu(m, dev, phys.drain, phys.idle, margin) for m in fut])
+                avg = [Menu(utility=np.mean([run[t].utility for run in runs], axis=0),
+                            drain=np.mean([run[t].drain for run in runs], axis=0),
+                            bids=runs[0][t].bids,
+                            x_energy=np.mean([run[t].x_energy for run in runs], axis=0))
+                       for t in range(horizon - 1)]
+                p = plan(battery, [menu_now] + avg, phys.cutoff, phys.recharge)
+            a = p.action
+            if self.lookahead and modelled:
+                a = self._lookahead(r, horizon, p, menu_now, dev, battery, now, margin)
             self.plan = p
             self.plan_round = r
-            a = p.action
         else:
             # The last round: leftover charge is worth nothing, so spend it.
             # With planning switched off (an ablation) charge gets a fixed price.
@@ -216,6 +255,28 @@ class Strategist:
         }
 
     # ----------------------------------------------------------- internals
+    def _lookahead(self, r: int, horizon: int, p: Plan, menu_now, dev: Device,
+                   battery: float, now: Market1, margin: float) -> int:
+        """Re-score the best few actions with the swarm re-simulated for each.
+
+        The DP treats the forecast as fixed, but our energy bid this round
+        changes how much energy the bots win, how fast they drain, and so when
+        they nap. For each short-listed action, roll the swarm forward again
+        under it and value the rest of the run on that forecast.
+        """
+        phys = self.market.physics
+        short = [int(i) for i in np.argsort(-p.q_values)[: self.lookahead]]
+        best_a, best_v = p.action, -np.inf
+        for c in short:
+            acts = [c] + list(p.action_path[1:])
+            futures, _ = self._forecast(r, horizon, acts, dev, battery, now)
+            menus = [round_menu(m, dev, phys.drain, phys.idle, margin) for m in futures]
+            after = max(0.0, battery - float(menu_now.drain[c]))
+            v = float(menu_now.utility[c]) + value(after, menus, phys.cutoff, phys.recharge)
+            if v > best_v + 1e-9:
+                best_a, best_v = c, v
+        return best_a
+
     def _prior_actions(self, r: int, horizon: int) -> List[int]:
         """Last round's plan, shifted to start at this round."""
         if self.plan is not None and getattr(self, "plan_round", None) == r - 1:
@@ -226,18 +287,20 @@ class Strategist:
         return prior + [DEFAULT_ACTION] * (horizon - len(prior))
 
     def _forecast(self, r: int, horizon: int, actions: List[int], dev: Device,
-                  battery: float, now: Market1):
+                  battery: float, now: Market1, rng: Optional[np.random.Generator] = None):
         """Roll the swarm forward under our planned actions.
 
         Returns one `Market1` per future round, and who is expected awake in
-        each. Future capacities and budgets are their running means; the
-        bots' bids, batteries and private histories are simulated exactly.
+        each. Future capacities are their running means, or with `rng` a
+        draw around them; the bots' bids, batteries and private histories are
+        simulated exactly.
         """
         mk = self.market
         phys = mk.physics
         n = self.n_obs
         mean_caps = {k: self.cap_sum[k] / n for k in RESOURCES}
         mean_budget = self.budget_sum / n
+        jitter = CAPACITY_JITTER
 
         bots = [
             {"node": nd, "battery": nd.battery, "last": nd.last_record,
@@ -296,7 +359,12 @@ class Strategist:
                 elif bot["alive"]:
                     bot["battery"] = min(1.0, bot["battery"] + phys.recharge)
             pub_prices = {k: max(0.01, totals[k] / max(caps[k], 1e-9)) for k in RESOURCES}
-            caps, budget = dict(mean_caps), mean_budget
+            if rng is None:
+                caps = dict(mean_caps)
+            else:
+                caps = {k: mean_caps[k] * float(rng.uniform(1 - jitter, 1 + jitter))
+                        for k in RESOURCES}
+            budget = mean_budget
 
         return futures, awake_seq
 

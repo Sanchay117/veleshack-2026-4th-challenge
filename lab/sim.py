@@ -21,13 +21,14 @@ from __future__ import annotations
 
 import argparse
 import json
-import math
+import multiprocessing
+import os
 import statistics
 import sys
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Sequence
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -42,6 +43,10 @@ import strategy as ours  # noqa: E402
 from opponents import clamp  # noqa: E402
 
 RESOURCES = ("compute", "energy", "security")
+
+# Experiments measure strategy, so the live agent's think-time guard is lifted:
+# results must not depend on how busy the machine running them is.
+ours.THINK_BUDGET = 1e9
 
 
 # ---------------------------------------------------------------------------
@@ -107,6 +112,8 @@ SEATS: Dict[str, Callable[[], Any]] = {
     "ours": lambda: BrainSeat(),
     "ours-no-model": lambda: BrainSeat(use_opponent_model=False),
     "ours-no-plan": lambda: BrainSeat(use_planner=False),
+    "ours-look": lambda: BrainSeat(lookahead=4),
+    "ours-sampled": lambda: BrainSeat(scenarios=6),
 }
 
 
@@ -127,54 +134,74 @@ class RunResult:
     think_ms: float = 0.0
 
 
+@dataclass
+class Player:
+    team: str
+    seat: Any
+    node: Any = None
+    history: List[dict] = field(default_factory=list)
+    think: float = 0.0
+
+
+def _play(arena: Arena, cfg: ScenarioConfig, p: Player, state, pub: dict) -> None:
+    """One player's turn: observe the round, and bid if allowed to."""
+    node = p.node
+    ok = node.admissible(cfg.battery_cutoff, cfg.kappa_bar)
+    payload = {**pub, "budget": node.budget,
+               "you": {"node_id": node.node_id, "admissible": ok,
+                       "battery": round(node.battery, 4),
+                       "compromise": node.compromise, "already_submitted": False}}
+    p.seat.observe(payload, arena.swarm(), node.node_id)
+    if ok:
+        t = time.perf_counter()
+        bid = p.seat.decide(payload, node.profile(), p.history, cfg.total_rounds)
+        p.think += time.perf_counter() - t
+        arena.submit(node, state.index, clamp(bid, node.budget))
+
+
 def run(seed: int, team: str, seat_name: str, scenario: str = "graded",
-        keep_rounds: bool = False) -> RunResult:
+        keep_rounds: bool = False, overrides: Optional[Dict[str, Any]] = None,
+        strangers: Sequence[str] = (), join_round: int = 1) -> RunResult:
+    """Play one run with `seat_name` in our seat.
+
+    overrides   scenario fields to change (e.g. battery_drain) - physics the
+                agent has never been told about
+    strangers   extra non-baseline players (seat names) the opponent model
+                has no shadow for
+    join_round  the round our agent registers in; the bots play alone before
+    """
     cfg = ScenarioConfig.load(scenario)
     cfg.seed = seed
+    for k, v in (overrides or {}).items():
+        setattr(cfg, k, v)
+    # No wall clock here: a round stays open until everyone has played, so a
+    # loaded machine measures strategy, not CPU contention. (Think time is
+    # reported separately and guarded in the agent itself.)
+    cfg.round_seconds = 3600.0
     arena = Arena(cfg)
-    bot_nodes = {}
-    for b in cfg.baselines:
-        node = arena.register(f"bot-{b}")
-        bot_nodes[node.node_id] = (node, baseline_bots.STRATEGIES[b], [])
-    me = arena.register(team)
-    seat = SEATS[seat_name]()
-    my_history: List[dict] = []
+    bots = [Player(f"bot-{b}", FnSeat(baseline_bots.STRATEGIES[b])) for b in cfg.baselines]
+    for p in bots:
+        p.node = arena.register(p.team)
+    me = Player(team, SEATS[seat_name]())
+    others = [Player(f"stranger-{i}-{s}", SEATS[s]()) for i, s in enumerate(strangers)]
     rounds_log: List[dict] = []
-    t_think = 0.0
 
-    for _ in range(cfg.total_rounds):
+    for index in range(1, cfg.total_rounds + 1):
+        if index == join_round:
+            me.node = arena.register(team)
+            for p in others:
+                p.node = arena.register(p.team)
         state = arena.open_round()
         pub = state.public()
-
-        for node, fn, hist in bot_nodes.values():
-            if node.admissible(cfg.battery_cutoff, cfg.kappa_bar):
-                bid = fn(budget=node.budget, prices=pub["prices"],
-                         capacities=pub["capacities"], profile=node.profile(),
-                         history=hist)
-                arena.submit(node, state.index, clamp(bid, node.budget))
-
-        admissible = me.admissible(cfg.battery_cutoff, cfg.kappa_bar)
-        payload = {**pub, "budget": me.budget,
-                   "you": {"node_id": me.node_id, "admissible": admissible,
-                           "battery": round(me.battery, 4),
-                           "compromise": me.compromise, "already_submitted": False}}
-        seat.observe(payload, arena.swarm(), me.node_id)
-        if admissible:
-            t = time.perf_counter()
-            profile = me.profile()
-            bid = seat.decide(payload, profile, my_history, cfg.total_rounds)
-            t_think += time.perf_counter() - t
-            arena.submit(me, state.index, clamp(bid, me.budget))
-
+        for p in bots + others + [me]:
+            if p.node is not None:
+                _play(arena, cfg, p, state, pub)
         arena.settle()
-        for node, fn, hist in bot_nodes.values():
-            res = state.results.get(node.node_id)
-            if res:
-                hist.append(res)
-        res = state.results.get(me.node_id)
-        if res:
-            my_history.append(res)
+        for p in bots + others + [me]:
+            if p.node is not None and p.node.node_id in state.results:
+                p.history.append(state.results[p.node.node_id])
         if keep_rounds:
+            seat = me.seat
             rounds_log.append({
                 "round": state.index,
                 "lsw": state.lsw,
@@ -187,39 +214,52 @@ def run(seed: int, team: str, seat_name: str, scenario: str = "graded",
             })
 
     return RunResult(
-        seed=seed, team=team, strategy=seat_name, score=me.score,
-        bots={n.team: n.score for n, _, _ in bot_nodes.values()},
-        idle=me.rounds_idle, floors=me.floor_violations,
+        seed=seed, team=team, strategy=seat_name, score=me.node.score,
+        bots={p.team: p.node.score for p in bots + others},
+        idle=me.node.rounds_idle, floors=me.node.floor_violations,
         lsw=[r.lsw for r in arena.rounds if r.settled],
         rounds=rounds_log,
-        think_ms=1000 * t_think / max(1, me.rounds_participated),
+        think_ms=1000 * me.think / max(1, me.node.rounds_participated),
     )
 
 
 # ---------------------------------------------------------------------------
 # Many runs
 # ---------------------------------------------------------------------------
-def compare(seeds: List[int], teams: List[str], strategies: List[str],
-            scenario: str = "graded") -> Dict[str, Any]:
+def _one_case(args) -> List[dict]:
+    """Every strategy on one (seed, device), plus the template anchor T."""
+    seed, team, strategies, scenario, kw = args
+    base = run(seed, team, "template", scenario, **kw)
     rows = []
-    for seed in seeds:
-        for team in teams:
-            base = run(seed, team, "template", scenario)
-            for s in strategies:
-                r = base if s == "template" else run(seed, team, s, scenario)
-                rows.append({
-                    "seed": seed, "team": team, "strategy": s, "score": r.score,
-                    "T": base.score, "best_bot": max(r.bots.values()),
-                    "idle": r.idle, "floors": r.floors,
-                    "lsw": statistics.fmean(r.lsw) if r.lsw else 0.0,
-                    "think_ms": r.think_ms,
-                })
+    for s in strategies:
+        r = base if s == "template" else run(seed, team, s, scenario, **kw)
+        rows.append({
+            "seed": seed, "team": team, "strategy": s, "score": r.score,
+            "T": base.score, "best_bot": max(v for k, v in r.bots.items() if k.startswith("bot-")),
+            "bots": r.bots, "bots_under_T": base.bots,
+            "idle": r.idle, "floors": r.floors,
+            "lsw": statistics.fmean(r.lsw) if r.lsw else 0.0,
+            "think_ms": r.think_ms,
+        })
+    return rows
+
+
+def compare(seeds: List[int], teams: List[str], strategies: List[str],
+            scenario: str = "graded", jobs: int = 1, **kw) -> Dict[str, Any]:
+    cases = [(seed, team, strategies, scenario, kw) for seed in seeds for team in teams]
+    if jobs > 1:
+        with multiprocessing.get_context("spawn").Pool(jobs) as pool:
+            chunks = pool.map(_one_case, cases)
+    else:
+        chunks = [_one_case(c) for c in cases]
+    rows = [r for chunk in chunks for r in chunk]
     summary = {}
     for s in strategies:
         sub = [x for x in rows if x["strategy"] == s]
         summary[s] = {
             "mean_score": statistics.fmean(x["score"] for x in sub),
             "vs_template_pct": 100 * statistics.fmean(x["score"] / x["T"] - 1 for x in sub),
+            "worst_vs_template_pct": 100 * min(x["score"] / x["T"] - 1 for x in sub),
             "vs_best_bot_pct": 100 * statistics.fmean(x["score"] / x["best_bot"] - 1 for x in sub),
             "beats_all_bots": sum(x["score"] > x["best_bot"] for x in sub) / len(sub),
             "idle": statistics.fmean(x["idle"] for x in sub),
@@ -230,27 +270,45 @@ def compare(seeds: List[int], teams: List[str], strategies: List[str],
     return {"rows": rows, "summary": summary}
 
 
+def print_summary(out: Dict[str, Any]) -> None:
+    print(f"{'strategy':<16}{'score':>8}{'vs T':>9}{'worst':>8}{'vs best bot':>13}"
+          f"{'beats all':>11}{'idle':>7}{'floors':>8}{'LSW':>8}{'ms':>7}")
+    for s, v in out["summary"].items():
+        print(f"{s:<16}{v['mean_score']:>8.2f}{v['vs_template_pct']:>8.1f}%"
+              f"{v['worst_vs_template_pct']:>7.1f}%"
+              f"{v['vs_best_bot_pct']:>12.1f}%{v['beats_all_bots']:>10.0%}"
+              f"{v['idle']:>7.1f}{v['floors']:>8.1f}{v['lsw']:>8.2f}{v['think_ms']:>7.1f}")
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     p = argparse.ArgumentParser(description="Compare strategies in-process.")
     p.add_argument("--seeds", type=int, default=10)
     p.add_argument("--first-seed", type=int, default=1)
-    p.add_argument("--teams", type=int, default=3)
+    p.add_argument("--teams", type=int, default=3, help="number of generated devices")
+    p.add_argument("--team", nargs="+", default=None, help="explicit team names instead")
     p.add_argument("--strategy", nargs="+", default=["template", "taper", "ours"])
     p.add_argument("--scenario", default="graded")
+    p.add_argument("--drain", type=float, default=None, help="override battery_drain")
+    p.add_argument("--recharge", type=float, default=None, help="override recharge_rate")
+    p.add_argument("--rounds", type=int, default=None, help="override total_rounds")
+    p.add_argument("--stranger", nargs="*", default=[], help="extra unmodelled players")
+    p.add_argument("--join", type=int, default=1, help="round our agent joins in")
+    p.add_argument("--jobs", type=int, default=os.cpu_count() or 1)
     p.add_argument("--json", default=None)
     a = p.parse_args(argv)
 
+    overrides = {k: v for k, v in (("battery_drain", a.drain), ("recharge_rate", a.recharge),
+                                   ("total_rounds", a.rounds)) if v is not None}
     seeds = list(range(a.first_seed, a.first_seed + a.seeds))
-    teams = [f"team-{i}" for i in range(a.teams)]
+    teams = a.team or [f"team-{i}" for i in range(a.teams)]
     t = time.time()
-    out = compare(seeds, teams, a.strategy, a.scenario)
-    print(f"{len(seeds)} seeds x {len(teams)} devices, {time.time() - t:.1f}s\n")
-    print(f"{'strategy':<16}{'score':>8}{'vs T':>9}{'vs best bot':>13}{'beats all':>11}"
-          f"{'idle':>7}{'floors':>8}{'LSW':>8}{'ms':>7}")
-    for s, v in out["summary"].items():
-        print(f"{s:<16}{v['mean_score']:>8.2f}{v['vs_template_pct']:>8.1f}%"
-              f"{v['vs_best_bot_pct']:>12.1f}%{v['beats_all_bots']:>10.0%}"
-              f"{v['idle']:>7.1f}{v['floors']:>8.1f}{v['lsw']:>8.2f}{v['think_ms']:>7.1f}")
+    out = compare(seeds, teams, a.strategy, a.scenario, jobs=a.jobs,
+                  overrides=overrides, strangers=a.stranger, join_round=a.join)
+    print(f"{len(seeds)} seeds x {len(teams)} devices, {time.time() - t:.1f}s"
+          + (f"  overrides={overrides}" if overrides else "")
+          + (f"  strangers={a.stranger}" if a.stranger else "")
+          + (f"  join_round={a.join}" if a.join > 1 else "") + "\n")
+    print_summary(out)
     if a.json:
         Path(a.json).write_text(json.dumps(out, indent=1))
     return 0

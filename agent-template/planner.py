@@ -39,15 +39,17 @@ import numpy as np
 from econ import EPS, bid_for_share, ces, floor_factor, share
 
 #: Energy bid as a fraction of the budget. Dense near zero, because the first
-#: sliver of energy is where sqrt(x) pays the most.
-ENERGY_FRACTIONS = np.array([
-    0.0, 0.002, 0.004, 0.007, 0.01, 0.015, 0.02, 0.03, 0.04, 0.05, 0.065,
-    0.08, 0.1, 0.12, 0.15, 0.18, 0.22, 0.26, 0.3, 0.35, 0.42, 0.5, 0.6, 0.75,
-])
+#: sliver of energy is where sqrt(x) pays the most. (Measured: this 41-point
+#: grid scores 0.85 points more than a 24-point one, for ~1.7x the compute.)
+ENERGY_FRACTIONS = np.unique(np.concatenate([
+    np.linspace(0.0, 0.02, 11),
+    np.linspace(0.02, 0.2, 19),
+    np.linspace(0.2, 0.8, 13),
+]))
 
 #: Compute share of what is left after energy. The two floor-binding splits
 #: are appended per row, so floors are bought exactly rather than to the grid.
-SPLITS = np.linspace(0.0, 1.0, 161)
+SPLITS = np.linspace(0.0, 1.0, 401)
 
 #: Battery grid for the DP.
 BATTERY_GRID = np.linspace(0.0, 1.0, 401)
@@ -126,9 +128,8 @@ class Plan:
     value: float                   # expected utility still to come
 
 
-def plan(battery: float, menus: Sequence[Menu], cutoff: float,
-         recharge: float) -> Plan:
-    """Solve the battery DP over the remaining rounds; menus[0] is this round."""
+def _solve(menus: Sequence[Menu], cutoff: float, recharge: float):
+    """Backward induction. values[t](B) is the utility still to come from round t."""
     grid = BATTERY_GRID
     horizon = len(menus)
     V_next = np.zeros_like(grid)
@@ -147,6 +148,23 @@ def plan(battery: float, menus: Sequence[Menu], cutoff: float,
         policies[t] = act
         values[t] = V
         V_next = V
+    return values, policies
+
+
+def value(battery: float, menus: Sequence[Menu], cutoff: float, recharge: float) -> float:
+    """Utility still to come from menus[0] onward, starting at `battery`."""
+    if not menus:
+        return 0.0
+    values, _ = _solve(menus, cutoff, recharge)
+    return float(np.interp(battery, BATTERY_GRID, values[0]))
+
+
+def plan(battery: float, menus: Sequence[Menu], cutoff: float,
+         recharge: float) -> Plan:
+    """Solve the battery DP over the remaining rounds; menus[0] is this round."""
+    grid = BATTERY_GRID
+    horizon = len(menus)
+    values, policies = _solve(menus, cutoff, recharge)
 
     # This round, evaluated at the exact charge rather than on the grid.
     mu0 = menus[0]
