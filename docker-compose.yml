@@ -88,6 +88,10 @@ services:
       ARENA_URL: http://arena:8080
       TEAM_NAME: ${TEAM_NAME:?set TEAM_NAME in your .env file}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      # Live dashboard. Off unless set; the graded `docker run` leaves it unset.
+      TELEMETRY_PORT: "8090"
+    ports:
+      - "${DASHBOARD_PORT:-8090}:8090"
     depends_on:
       arena:
         condition: service_healthy

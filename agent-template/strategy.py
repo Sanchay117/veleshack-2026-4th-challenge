@@ -130,7 +130,8 @@ class Strategist:
         t0 = time.perf_counter()
         r = int(payload["round"])
         budget = float(payload.get("budget") or 0.0)
-        caps = {k: float(v) for k, v in (payload.get("capacities") or {}).items()}
+        given = payload.get("capacities") or {}
+        caps = {k: float(given.get(k, 1.0)) for k in RESOURCES}
         feats = profile.get("features") or {}
         dev = Device(
             weights={k: float(v) for k, v in profile["weights"].items()},
@@ -195,7 +196,7 @@ class Strategist:
             self.plan = None
 
         bid = dict(zip(("compute", "energy", "security"), map(float, menu_now.bids[a])))
-        bid = clamp(bid, budget)
+        bid = clamp(bid, budget, down=True)
         if modelled:
             self.market.record_my_bid(r, bid)
 
@@ -403,7 +404,7 @@ def safe_bid(budget: float, profile: Dict[str, Any]) -> Dict[str, float]:
     bid["energy"] -= freed
     bid["compute"] += freed / 2
     bid["security"] += freed / 2
-    return clamp(bid, budget)
+    return clamp(bid, budget, down=True)
 
 
 # ---------------------------------------------------------------------------

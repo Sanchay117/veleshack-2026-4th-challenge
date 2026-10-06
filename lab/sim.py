@@ -41,6 +41,7 @@ from arena.state import Arena  # noqa: E402
 import bot as baseline_bots  # noqa: E402
 import strategy as ours  # noqa: E402
 from opponents import clamp  # noqa: E402
+from runner import clamp as runner_clamp  # noqa: E402
 
 RESOURCES = ("compute", "energy", "security")
 
@@ -156,7 +157,11 @@ def _play(arena: Arena, cfg: ScenarioConfig, p: Player, state, pub: dict) -> Non
         t = time.perf_counter()
         bid = p.seat.decide(payload, node.profile(), p.history, cfg.total_rounds)
         p.think += time.perf_counter() - t
-        arena.submit(node, state.index, clamp(bid, node.budget))
+        # Each player's bid goes through the same last step as in the live
+        # system: the bots' runner clamps without rounding, ours rounds down.
+        legal = runner_clamp(bid, node.budget) if isinstance(p.seat, FnSeat) \
+            else clamp(bid, node.budget, down=True)
+        arena.submit(node, state.index, legal)
 
 
 def run(seed: int, team: str, seat_name: str, scenario: str = "graded",

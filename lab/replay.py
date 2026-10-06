@@ -30,6 +30,7 @@ from telemetry import DASHBOARD, Telemetry
 from arena.config import ScenarioConfig
 from arena.state import Arena
 from opponents import clamp
+from runner import clamp as runner_clamp
 import bot as baseline_bots
 
 
@@ -59,7 +60,7 @@ def record(seed: int, team: str, scenario: str = "graded") -> List[Dict[str, Any
             if node.admissible(cfg.battery_cutoff, cfg.kappa_bar):
                 bid = fn(budget=node.budget, prices=pub["prices"], capacities=pub["capacities"],
                          profile=node.profile(), history=hist)
-                arena.submit(node, state.index, clamp(bid, node.budget))
+                arena.submit(node, state.index, runner_clamp(bid, node.budget))
         ok = me.admissible(cfg.battery_cutoff, cfg.kappa_bar)
         payload = {**pub, "budget": me.budget,
                    "you": {"admissible": ok, "battery": round(me.battery, 4)}}
@@ -67,7 +68,7 @@ def record(seed: int, team: str, scenario: str = "graded") -> List[Dict[str, Any
         if ok:
             bid = seat.decide(payload, me.profile(), history, cfg.total_rounds)
             tel.on_decision(seat.brain.last)
-            arena.submit(me, state.index, clamp(bid, me.budget))
+            arena.submit(me, state.index, clamp(bid, me.budget, down=True))
         else:
             seat.brain.note_rest(payload)
             tel.on_decision(seat.brain.last)

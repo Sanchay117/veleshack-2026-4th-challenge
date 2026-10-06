@@ -15,7 +15,7 @@ PY ?= python3
 
 .DEFAULT_GOAL := help
 .PHONY: help up down logs agent agent-logs check check-docker graded reset board \
-        status install dev-arena dev-bots dev-agent lint clean
+        status install dev-arena dev-bots dev-agent lint clean test sim replay demo
 
 ## ---------------------------------------------------------------- docker ---
 
@@ -87,6 +87,21 @@ dev-bots:  ## Run the three baseline bots natively (needs dev-arena running)
 dev-agent:  ## Run your agent natively (needs dev-arena running)
 	cd agent-template && ARENA_URL=http://localhost:8080 \
 	  TEAM_NAME=$${TEAM_NAME:-unnamed-team} $(PY) agent.py
+
+## ------------------------------------------------------- team NullPointer ---
+
+test:  ## Unit tests for the agent (stdlib unittest, no extra dependencies)
+	$(PY) -m unittest discover -s tests -p 'test_*.py'
+
+sim:  ## Compare strategies in-process over many seeds (see lab/sim.py --help)
+	$(PY) lab/sim.py --seeds 20 --teams 3 --strategy template taper ours ours-no-model ours-no-plan
+
+replay:  ## Replay a simulated run in the dashboard on http://localhost:8090
+	$(PY) lab/replay.py --seed $${SEED:-2} --team $${TEAM_NAME:-team-0} --speed $${SPEED:-0.8}
+
+demo:  ## Live: arena + bots + our agent, dashboard on http://localhost:8090
+	$(COMPOSE) up -d --build arena bot-naive-max bot-even-split bot-proportional
+	$(COMPOSE) --profile agent up --build agent
 
 ## ------------------------------------------------------------------ chores ---
 

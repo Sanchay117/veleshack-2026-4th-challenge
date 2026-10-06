@@ -29,6 +29,7 @@ SPDX-License-Identifier: Apache-2.0
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional
 
@@ -112,12 +113,27 @@ SHADOWS: Dict[str, Callable[..., Bid]] = {
 }
 
 
-def clamp(bid: Bid, budget: float) -> Bid:
-    """What the bots' runner and the arena do to a bid before it counts."""
-    clean = {k: max(0.0, float(bid.get(k, 0.0))) for k in RESOURCES}
+def clamp(bid: Bid, budget: float, down: bool = False) -> Bid:
+    """What the bots' runner and the arena do to a bid before it counts.
+
+    Values are rounded to six decimals, as the arena reports them. Rounding to
+    nearest can leave the sum up to 1.5e-6 over budget - past the arena's 1e-6
+    tolerance, which is a compromise penalty. `down=True` rounds every value
+    down instead, so a bid we send can never be over budget; it is used for
+    our own bids, while forecasts of the bots keep round-to-nearest.
+    """
+    clean = {}
+    for k in RESOURCES:
+        try:
+            v = float(bid.get(k, 0.0))
+        except (TypeError, ValueError):
+            v = 0.0
+        clean[k] = v if math.isfinite(v) and v > 0.0 else 0.0
     total = sum(clean.values())
     if total > budget and total > 0:
         clean = {k: v * (budget / total) for k, v in clean.items()}
+    if down:
+        return {k: math.floor(v * 1e6) / 1e6 for k, v in clean.items()}
     return {k: round(v, 6) for k, v in clean.items()}
 
 
