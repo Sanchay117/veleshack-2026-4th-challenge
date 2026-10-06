@@ -35,6 +35,17 @@ MAX_ATTEMPTS = 5
 BACKOFF_BASE = 0.25
 BACKOFF_CAP = 1.5
 
+# The critical path - reading the round and placing the bid - runs against the
+# round's own clock instead. An injected 503 says nothing about the next
+# request (the faults are independent dice rolls), so waiting the suggested
+# full second three times in a row is how a round is lost: measured, it was
+# the only round our agent ever missed. Against a deadline we back off
+# exponentially with full jitter from a much smaller base, never sleep past the
+# close, and keep trying for as long as the round is open.
+FAST_BACKOFF_BASE = 0.06
+FAST_BACKOFF_CAP = 0.5
+DEADLINE_GUARD = 0.15   # stop retrying this long before the round closes
+
 
 class ArenaClientError(Exception):
     """Base class for everything this client raises."""
@@ -118,6 +129,23 @@ class ArenaClient:
         delay = min(BACKOFF_BASE * (2 ** attempt), BACKOFF_CAP)
         time.sleep(delay * (0.5 + self._rng.random()))  # full jitter
 
+    def _sleep_fast(self, attempt: int, deadline: Optional[float]) -> bool:
+        """Deadline-aware backoff for the critical path.
+
+        Exponential with full jitter from a small base, and never past the
+        deadline (a `time.monotonic()` value). Returns False when there is no
+        time left to try again.
+        """
+        delay = min(FAST_BACKOFF_BASE * (2 ** attempt), FAST_BACKOFF_CAP)
+        delay *= 0.5 + self._rng.random()
+        if deadline is not None:
+            left = deadline - DEADLINE_GUARD - time.monotonic()
+            if left <= 0.0:
+                return False
+            delay = min(delay, left)
+        time.sleep(delay)
+        return True
+
     def _request(
         self,
         method: str,
@@ -126,11 +154,20 @@ class ArenaClient:
         json: Optional[dict] = None,
         auth: bool = True,
         allow_reregister: bool = True,
+        fast: bool = False,
+        deadline: Optional[float] = None,
     ) -> Dict[str, Any]:
+        """One API call with retries.
+
+        `fast=True` selects the critical-path policy: small jittered backoff,
+        and with a `deadline` it keeps retrying until that moment rather than
+        for a fixed number of attempts.
+        """
         url = f"{self.base_url}{path}"
         last_error: Optional[Exception] = None
+        attempts = 60 if (fast and deadline is not None) else self.max_attempts
 
-        for attempt in range(self.max_attempts):
+        for attempt in range(attempts):
             try:
                 response = self._http.request(
                     method, url, json=json, headers=self._headers() if auth else {}
@@ -138,7 +175,11 @@ class ArenaClient:
             except httpx.HTTPError as exc:
                 last_error = exc
                 LOG.debug("network error on %s %s: %s", method, path, exc)
-                self._sleep_backoff(attempt, None)
+                if fast:
+                    if not self._sleep_fast(attempt, deadline):
+                        break
+                else:
+                    self._sleep_backoff(attempt, None)
                 continue
 
             status = response.status_code
@@ -150,7 +191,11 @@ class ArenaClient:
 
             if status in (429, 503):
                 LOG.debug("transient %s on %s (attempt %d)", status, path, attempt + 1)
-                self._sleep_backoff(attempt, response.headers.get("retry-after"))
+                if fast:
+                    if not self._sleep_fast(attempt, deadline):
+                        break
+                else:
+                    self._sleep_backoff(attempt, response.headers.get("retry-after"))
                 continue
 
             if status == 401 and auth and allow_reregister:
@@ -174,7 +219,7 @@ class ArenaClient:
             raise ArenaClientError(f"{method} {path} -> {status}: {detail}")
 
         raise ArenaClientError(
-            f"{method} {path} failed after {self.max_attempts} attempts"
+            f"{method} {path} failed after retrying"
             + (f": {last_error}" if last_error else "")
         )
 
@@ -207,7 +252,14 @@ class ArenaClient:
 
     # --------------------------------------------------------------- auction
     def get_round(self) -> Dict[str, Any]:
-        payload = self._request("GET", "/v1/round")
+        """Read the open round. Fast retries: seeing a new round late eats its window.
+
+        Stamps the payload with `_deadline`, the round's close on our own
+        monotonic clock (from `seconds_remaining`, so host clock skew between
+        us and the arena does not matter).
+        """
+        payload = self._request("GET", "/v1/round", fast=True)
+        payload["_deadline"] = time.monotonic() + float(payload.get("seconds_remaining", 0.0))
         self._refresh_live_features(payload)
         return payload
 
@@ -239,9 +291,12 @@ class ArenaClient:
             if key in you:
                 features[key] = you[key]
 
-    def post_bid(self, round_index: int, bid: Dict[str, float]) -> Dict[str, Any]:
+    def post_bid(self, round_index: int, bid: Dict[str, float],
+                 deadline: Optional[float] = None) -> Dict[str, Any]:
+        """Submit a bid, retrying until the round's `deadline` if one is given."""
         return self._request(
-            "POST", "/v1/bid", json={"round": round_index, "bid": bid}
+            "POST", "/v1/bid", json={"round": round_index, "bid": bid},
+            fast=True, deadline=deadline,
         )
 
     def get_result(self, round_index: int, attempts: int = 2) -> Dict[str, Any]:
@@ -252,7 +307,8 @@ class ArenaClient:
         """
         saved, self.max_attempts = self.max_attempts, attempts
         try:
-            return self._request("GET", f"/v1/result/{round_index}")
+            # Fast policy: two slow retries here once cost a whole round.
+            return self._request("GET", f"/v1/result/{round_index}", fast=True)
         finally:
             self.max_attempts = saved
 
