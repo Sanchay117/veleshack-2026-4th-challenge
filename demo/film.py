@@ -168,12 +168,12 @@ def capture(url: str = "http://localhost:8090/api/state",
 # ---------------------------------------------------------------------------
 def _segment_slide(scene: dict, audio: Path, out: Path) -> None:
     length = PAD_IN + duration(audio) + PAD_OUT
-    frames = int(length * FPS)
     img = OUT / "slides" / f"{scene['id']}.png"
-    vf = (f"zoompan=z='1+0.035*on/{frames}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'"
-          f":d={frames}:s={W}x{H}:fps={FPS},"
+    # A still slide, held perfectly still. (A slow zoom via zoompan was tried
+    # and dropped: it snaps each frame to whole pixels, so text visibly wobbles.)
+    vf = (f"scale={W}:{H},fps={FPS},"
           f"fade=t=in:st=0:d=0.35,fade=t=out:st={length - 0.4:.2f}:d=0.4,format=yuv420p")
-    ff("-loop", "1", "-i", str(img), "-i", str(audio),
+    ff("-loop", "1", "-framerate", str(FPS), "-i", str(img), "-i", str(audio),
        "-filter_complex", f"[0:v]{vf}[v];[1:a]adelay={int(PAD_IN * 1000)}|{int(PAD_IN * 1000)},"
                           f"apad=whole_dur={length:.3f}[a]",
        "-map", "[v]", "-map", "[a]", "-t", f"{length:.3f}", "-r", str(FPS),
