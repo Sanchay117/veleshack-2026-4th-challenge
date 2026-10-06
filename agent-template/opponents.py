@@ -201,11 +201,19 @@ class Node:
     battery: float
     active: bool = True
     ejected: bool = False
-    last_record: Optional[dict] = None     # what the bot's own history[-1] holds
+    last_record: Optional[dict] = None     # our belief: what the bot's history[-1] holds
+    latest: Optional[dict] = None          # its most recent round, as the arena recorded it
+    records: List[dict] = field(default_factory=list)   # every round it played, newest last
+    advances: int = -1                     # >0: its history keeps up; <=0: it lags (see _reconcile)
     predicted: Optional[Bid] = None        # our forecast of its bid this round
 
     def profile(self) -> Dict[str, Any]:
         return {"weights": self.weights, "q_min": self.q_min, "s_min": self.s_min}
+
+    @property
+    def lags(self) -> bool:
+        """Its own history does not keep up with the rounds it plays."""
+        return self.shadow is _proportional and self.advances <= 0
 
     def admissible(self, cutoff: float) -> bool:
         return self.active and not self.ejected and self.battery > cutoff + 1e-12
@@ -294,28 +302,57 @@ class Market:
             self.residual[k] = 0.6 * self.residual[k] + 0.4 * max(0.0, gap)
         self.errors = self.errors[-60:]
 
-        # Self-healing. `proportional` is the only bot whose bid depends on its
-        # own past, so a forecast that went wrong once (a round we never saw,
-        # say) would otherwise stay wrong. If it is the only node in the round
-        # we could not pin down exactly, the clearing price tells us what it
-        # really bid, and its history is corrected from that.
+        # `proportional` is the only bot whose bid depends on its own past: it
+        # reads its last result, history[-1]. Which result that is depends on
+        # its client, not on the game. The template runner only ever asks for
+        # the result of the round it just bid in, which has not settled yet,
+        # so live it collects almost nothing and history[-1] is usually empty
+        # or many rounds old. A runner that did collect every result would
+        # advance it each round. We do not assume either.
+        #
+        # If it is the only node in the round we could not pin down exactly,
+        # the clearing price gives its true bid. When our forecast missed, we
+        # find which of its past results (or none) reproduces that bid, and
+        # keep score of whether its history advances or lags, so the next
+        # forecast uses the right one.
         stateful = [nid for nid in preds if self.nodes[nid].shadow is _proportional]
         strangers = any(n.shadow is None and n.admissible(self.physics.cutoff)
                         for n in self.nodes.values())
         if len(stateful) == 1 and not strangers and gaps:
             nid = stateful[0]
-            preds[nid] = {k: round(max(0.0, preds[nid][k] + gaps.get(k, 0.0)), 6)
-                          for k in RESOURCES}
+            node = self.nodes[nid]
+            missed = max(abs(g) for g in gaps.values()) > 1e-4
+            actual = {k: round(max(0.0, preds[nid][k] + gaps.get(k, 0.0)), 6) for k in RESOURCES}
+            used = node.last_record
+            if missed:
+                used = self._identify(node, prev, actual)
+            if used is not None and used is node.latest:
+                node.advances = min(5, node.advances + 1)
+            elif missed:
+                node.advances = max(-5, node.advances - 1)
+            preds[nid] = actual
+            node.last_record = used
 
-        # Advance each bot's private history exactly as its own client would.
+        # Record the round for every bot that played it.
         for nid, bid in preds.items():
             node = self.nodes.get(nid)
-            if node is not None and node.shadow is not None:
-                node.last_record = {
-                    "prices": prev["prices"],
-                    "capacities": prev["capacities"],
-                    "bid": bid,
-                }
+            if node is None or node.shadow is None:
+                continue
+            record = {"prices": prev["prices"], "capacities": prev["capacities"], "bid": bid}
+            node.records = (node.records + [record])[-40:]
+            node.latest = record
+            if node.shadow is not _proportional or node.advances > 0:
+                node.last_record = record
+
+    def _identify(self, node: Node, prev: dict, actual: Bid) -> Optional[dict]:
+        """Which past result (or none) makes the shadow bid what the bot bid?"""
+        budget = float(prev.get("budget") or 1.0)
+        for cand in [node.latest, *reversed(node.records), None]:
+            raw = node.shadow(budget, prev["prices"], prev["capacities"], node.profile(), cand)
+            out = clamp(raw, budget)
+            if max(abs(out[k] - actual[k]) for k in RESOURCES) < 2e-5:
+                return cand
+        return node.last_record
 
     # -------------------------------------------------------------- predict
     def predict(self, round_index: int) -> Dict[str, float]:

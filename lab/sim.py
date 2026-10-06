@@ -186,17 +186,34 @@ def _play(arena: Arena, cfg: ScenarioConfig, p: Player, state, pub: dict) -> Non
         arena.submit(node, state.index, legal)
 
 
+#: Chance that a baseline bot reads back the result of a round it played.
+#:
+#: The bots run `agent-template/runner.py`, which bids first and then asks
+#: only for the result of the round it just bid in - a round that is still
+#: open. The next round opens at the instant this one settles, so the bot bids
+#: again before it ever asks for the settled result. It reads one only when a
+#: poll happens to straddle the settlement, which we measured at roughly one
+#: round in thirty to fifty on a live arena. `proportional` is the only bot
+#: that reads its history, so this decides how it estimates the field.
+#: Set to 1.0 to model a runner that collects every result.
+BOT_COLLECT = 0.03
+
+
 def run(seed: int, team: str, seat_name: str, scenario: str = "graded",
         keep_rounds: bool = False, overrides: Optional[Dict[str, Any]] = None,
-        strangers: Sequence[str] = (), join_round: int = 1) -> RunResult:
+        strangers: Sequence[str] = (), join_round: int = 1,
+        bot_collect: float = BOT_COLLECT) -> RunResult:
     """Play one run with `seat_name` in our seat.
 
-    overrides   scenario fields to change (e.g. battery_drain) - physics the
-                agent has never been told about
-    strangers   extra non-baseline players (seat names) the opponent model
-                has no shadow for
-    join_round  the round our agent registers in; the bots play alone before
+    overrides    scenario fields to change (e.g. battery_drain) - physics the
+                 agent has never been told about
+    strangers    extra non-baseline players (seat names) the opponent model
+                 has no shadow for
+    join_round   the round our agent registers in; the bots play alone before
+    bot_collect  chance a bot reads back each of its results (see BOT_COLLECT)
     """
+    import random as _random
+    collect_rng = _random.Random(f"collect:{seed}:{team}")
     cfg = ScenarioConfig.load(scenario)
     cfg.seed = seed
     for k, v in (overrides or {}).items():
@@ -226,6 +243,8 @@ def run(seed: int, team: str, seat_name: str, scenario: str = "graded",
         arena.settle()
         for p in bots + others + [me]:
             if p.node is not None and p.node.node_id in state.results:
+                if p in bots and collect_rng.random() >= bot_collect:
+                    continue
                 p.history.append(state.results[p.node.node_id])
         if keep_rounds:
             seat = me.seat

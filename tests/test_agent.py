@@ -104,12 +104,15 @@ class OpponentModelInTheArena(unittest.TestCase):
     """In a full simulated run the forecast field matches the truth."""
 
     def test_forecast_is_exact(self):
+        """Exact apart from a round or two, whichever way the bots keep history."""
         import sim
-        r = sim.run(7, "team-test", "ours", keep_rounds=True)
-        errors = [row["brain"]["model_error"] for row in r.rounds if row["brain"]]
-        self.assertTrue(errors)
-        self.assertLess(max(errors), 1e-4)
-        self.assertEqual(r.floors, 0)
+        for collect in (sim.BOT_COLLECT, 1.0):
+            r = sim.run(7, "team-test", "ours", keep_rounds=True, bot_collect=collect)
+            errors = [row["brain"]["model_error"] for row in r.rounds if row["brain"]]
+            self.assertTrue(errors)
+            self.assertLess(sum(errors) / len(errors), 0.005, msg=f"collect={collect}")
+            self.assertLess(errors[-1], 1e-5)   # six-decimal rounding only
+            self.assertEqual(r.floors, 0)
 
     def test_unknown_player_is_absorbed(self):
         import sim

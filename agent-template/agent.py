@@ -109,8 +109,8 @@ def run() -> int:
     hb.start()
 
     history: List[Dict[str, Any]] = []
+    owed: List[int] = []          # rounds we bid in whose results we have not read
     last_bid_round = 0
-    last_result_round = 0
     last_seen_round = 0
     idle_polls = 0
 
@@ -146,8 +146,9 @@ def run() -> int:
                 max(last_bid_round, last_seen_round),
                 round_index,
             )
-            last_bid_round = last_result_round = last_seen_round = 0
+            last_bid_round = last_seen_round = 0
             history.clear()
+            owed.clear()
             BRAIN.reset()
             if cutoff is not None:
                 BRAIN.market.physics.cutoff = float(cutoff)
@@ -163,12 +164,16 @@ def run() -> int:
             _observe(client, rnd, telemetry)
 
         # ----------------------------------------------------- already done?
-        # Bidding comes BEFORE fetching the previous result. Reading results is
+        # Bidding comes BEFORE fetching results. Reading results is
         # bookkeeping; missing the bidding window is a lost round.
+        #
+        # The template asked only for the result of the round it had just bid
+        # on - which never settles while that round is open, and by the time
+        # it has, the next round is open and the loop bids instead. So it
+        # collected almost nothing (1 result in 49 rounds, measured). Results
+        # are now owed per round and collected once that round is over.
         if round_index <= last_bid_round or rnd.get("settled"):
-            _collect_result(client, history, last_bid_round, last_result_round)
-            last_result_round = max(last_result_round,
-                                    _last_collected(history, last_result_round))
+            _collect_owed(client, history, owed, round_index, bool(rnd.get("settled")))
             _stop.wait(min(0.3, max(0.05, float(rnd.get("seconds_remaining", 0.3)))))
             continue
 
@@ -205,6 +210,7 @@ def run() -> int:
         try:
             ack = client.post_bid(round_index, bid, deadline=rnd.get("_deadline"))
             last_bid_round = round_index
+            owed.append(round_index)
             if ack.get("warnings"):
                 LOG.warning("round %d accepted with warnings: %s",
                             round_index, ack["warnings"])
@@ -289,20 +295,32 @@ def _log_decision(d: Dict[str, Any]) -> None:
     )
 
 
-def _collect_result(client: ArenaClient, history: List[Dict[str, Any]],
-                    last_bid_round: int, last_result_round: int) -> None:
-    """Pull the last settled result into history. Best-effort, never blocking."""
-    if last_result_round >= last_bid_round or last_bid_round == 0:
+def _collect_owed(client: ArenaClient, history: List[Dict[str, Any]], owed: List[int],
+                  current: int, current_settled: bool) -> None:
+    """Read the results of rounds that are over. Best-effort, one per poll.
+
+    A round is over once a later round is open (or the final round reports
+    itself settled). Rounds that stay unreadable for a few rounds are given up
+    on, so a long fault burst cannot build a backlog in front of the bid.
+    """
+    owed[:] = [r for r in owed if r >= current - 4]
+    ready = [r for r in owed if r < current or (r == current and current_settled)]
+    if not ready:
         return
+    r = ready[0]
     try:
-        result = client.get_result(last_bid_round)
-    except (NoRound, ArenaClientError):
+        result = client.get_result(r)
+    except NoRound:
         return
+    except ArenaClientError:
+        return
+    owed.remove(r)
     if not result.get("participated"):
         return
-    if history and history[-1].get("round") == result.get("round"):
+    if any(h.get("round") == result.get("round") for h in history[-5:]):
         return
     history.append(result)
+    history.sort(key=lambda h: int(h.get("round", 0)))
     LOG.info(
         "round %d  result  utility=%.4f%s  battery=%.3f  total=%.3f",
         result["round"],
@@ -311,10 +329,6 @@ def _collect_result(client: ArenaClient, history: List[Dict[str, Any]],
         result.get("battery", 0.0),
         result.get("cumulative_score", 0.0),
     )
-
-
-def _last_collected(history: List[Dict[str, Any]], fallback: int) -> int:
-    return int(history[-1]["round"]) if history else fallback
 
 
 def _sanitise(bid: Any, budget: float) -> Dict[str, float]:

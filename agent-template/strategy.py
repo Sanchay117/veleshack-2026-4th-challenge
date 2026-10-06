@@ -355,8 +355,9 @@ class Strategist:
                     x_e = (caps["energy"] * bids[i]["energy"] / totals["energy"]
                            if totals["energy"] > 0 else 0.0)
                     bot["battery"] = max(0.0, bot["battery"] - phys.cost(x_e, nd.mobility))
-                    bot["last"] = {"prices": pub_prices, "capacities": dict(caps),
-                                   "bid": bids[i]}
+                    if not nd.lags:
+                        bot["last"] = {"prices": pub_prices, "capacities": dict(caps),
+                                       "bid": bids[i]}
                 elif bot["alive"]:
                     bot["battery"] = min(1.0, bot["battery"] + phys.recharge)
             pub_prices = {k: max(0.01, totals[k] / max(caps[k], 1e-9)) for k in RESOURCES}

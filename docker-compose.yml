@@ -34,6 +34,11 @@ services:
       # Leave ARENA_SEED unset to use the scenario's own seed. The organisers
       # inject the real one at grading time.
       ARENA_SEED: ${ARENA_SEED:-}
+      # Optional pacing overrides (empty = the scenario's own values), handy
+      # for a quick live demo: ARENA_ROUND_SECONDS=1.5 ARENA_LEASE_SECONDS=6
+      ARENA_ROUND_SECONDS: ${ARENA_ROUND_SECONDS:-}
+      ARENA_LEASE_SECONDS: ${ARENA_LEASE_SECONDS:-}
+      ARENA_START_DELAY: ${ARENA_START_DELAY:-}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
     healthcheck:
       test:
