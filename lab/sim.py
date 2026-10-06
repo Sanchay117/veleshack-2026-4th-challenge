@@ -107,8 +107,30 @@ def taper_fn(budget, prices, capacities, profile, history):
         others)
 
 
+class MyopicSeat(BrainSeat):
+    """Exact single-round best response to the known field, blind to the battery.
+
+    Isolates what the primer calls the Kelly best response: the optimal split
+    for this round alone, with charge treated as free.
+    """
+
+    def __init__(self) -> None:
+        super().__init__(use_planner=False)
+
+    def decide(self, payload, profile, history, total_rounds):
+        saved = ours.FIXED_SHADOW_PRICE
+        ours.FIXED_SHADOW_PRICE = 0.0
+        try:
+            return super().decide(payload, profile, history, total_rounds)
+        finally:
+            ours.FIXED_SHADOW_PRICE = saved
+
+
 SEATS: Dict[str, Callable[[], Any]] = {
     "template": lambda: FnSeat(baseline_bots.naive_max),
+    "even-split": lambda: FnSeat(baseline_bots.even_split),
+    "proportional": lambda: FnSeat(baseline_bots.proportional),
+    "best-response": lambda: MyopicSeat(),
     "taper": lambda: FnSeat(taper_fn),
     "ours": lambda: BrainSeat(),
     "ours-no-model": lambda: BrainSeat(use_opponent_model=False),

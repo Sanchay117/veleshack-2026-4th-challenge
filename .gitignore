@@ -20,6 +20,8 @@ env/
 scorecard-*.json
 results*.json
 conformance-*.json
+# ...except the measurements the README quotes, which are a deliverable.
+!docs/results/results.json
 
 # Editors / OS
 .claude/

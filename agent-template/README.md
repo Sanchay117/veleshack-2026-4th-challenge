@@ -1,56 +1,53 @@
-# Your agent
+# The agent (team NullPointerException)
 
-You hand in your whole fork of this repository. This folder is the part you
-change, and the part your Docker image is built from.
+This folder is the deliverable: the Docker image is built from it, with a
+plain `docker build .` and no arguments.
 
-It works as shipped — it registers, keeps its lease, bids every round and
-survives the faults the graded arena throws at it. It just does not bid *well*.
-
-## The one file you have to change
-
-**`strategy.py`** — a single function, `decide_bid`. Everything else here is
-plumbing that already works, and rewriting it is a good way to lose points to a
-bug rather than to a strategy.
-
-| File | Change it? |
+| File | Role |
 |---|---|
-| `strategy.py` | **yes, this is the challenge** |
-| `agent.py` | no. The main loop: registration, heartbeat thread, round loop, result fetch, clean shutdown |
-| `client.py` | no. HTTP with exponential backoff, jitter, auto re-registration, typed exceptions |
-| `runner.py` | optional. A compact reusable version of the loop if you prefer it to `agent.py` |
-| `Dockerfile` | only if you add dependencies |
-| `requirements.txt` | if you add dependencies |
+| `agent.py` | Main loop (template's, extended): registration, heartbeat thread, one swarm snapshot per round, bid before bookkeeping, decision logs, clean shutdown |
+| `client.py` | HTTP client (template's, extended): deadline-aware jittered retries on the critical path, auto re-registration, typed exceptions |
+| `strategy.py` | The decision: forecast the swarm, plan the battery, buy the floors exactly. `decide_bid` keeps the template signature |
+| `opponents.py` | Opponent model: shadows of the three baseline bots, residual for anything unexplained, battery physics fitted online |
+| `planner.py` | Per-round menu of (utility, battery cost) and the battery dynamic programme |
+| `econ.py` | The arena's game maths, restated for the agent |
+| `telemetry.py`, `dashboard/` | Optional live dashboard, off unless `TELEMETRY_PORT` is set |
+| `runner.py` | Template's compact loop, used by the baseline bots |
 
 ## Run it
 
 ```bash
-# from the repository root, with the arena already up
-make agent
+# from the repository root, with the arena already up (make up)
+make agent          # in Docker
+make demo           # in Docker, with the dashboard on http://localhost:8090
 
 # or natively
-ARENA_URL=http://localhost:8080 TEAM_NAME=team-kappa python agent.py
+pip install -r requirements.txt
+ARENA_URL=http://localhost:8080 TEAM_NAME=NullPointerException python agent.py
 ```
 
-Both variables come from the environment. **Do not hardcode them** — the
-grading harness injects its own, and hardcoding costs engineering points.
+| Variable | Default | |
+|---|---|---|
+| `ARENA_URL` | `http://localhost:8080` | arena base URL |
+| `TEAM_NAME` | `unnamed-team` | decides the device profile; ours is `NullPointerException` |
+| `LOG_LEVEL` | `INFO` | `DEBUG` adds every HTTP request |
+| `TELEMETRY_PORT` | unset (off) | serve the dashboard and `/api/state` on this port |
 
-## Before you submit
+## A decision, as logged
+
+```
+round 23  battery=0.142  awake=2  bid=C0.512/E0.061/S0.391  x_E=0.086  exp_u=0.403  shadow=0.84  model=shadow(err 0.0000)  41ms
+```
+
+Battery at the start of the round, how many rivals are awake, the bid, the
+energy share it buys, the utility the planner expects, the value of one unit
+of charge right now, the opponent model's measured error, and think time.
+
+## Before submitting
 
 ```bash
-make check
+make check                                              # conformance, as a process
+docker build -t nullpointerexception/agent .            # from this folder
+make check-docker IMAGE=nullpointerexception/agent      # conformance, the image itself
+make test                                               # unit tests
 ```
-
-Runs the organisers' conformance suite against your agent, fault injection
-included. Green here predicts your functional and resilience score.
-
-Then check the boring things, because this is where strong teams lose points:
-
-- Your repository clones and builds on a machine that has never seen your
-  laptop. No `.env` committed, no absolute paths.
-- Every dependency you installed by hand is in `requirements.txt`.
-- `docker build .` works from a clean clone.
-- Your README says what your strategy does, in 300 words or fewer.
-
-## Where the wins are
-
-Read [`../docs/strategy-primer.md`](../docs/strategy-primer.md).

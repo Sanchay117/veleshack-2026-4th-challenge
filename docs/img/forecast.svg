@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 330" width="960" height="330">
+<rect width="960" height="330" rx="14" fill="#0c1324"/>
+<text x="28.0" y="38.0" font-family="-apple-system,BlinkMacSystemFont,Inter,Segoe UI,Roboto,sans-serif" font-size="19" fill="#e6ecff" text-anchor="start" font-weight="700">How far ahead we know when a bot will nap</text>
+<text x="28.0" y="62.0" font-family="-apple-system,BlinkMacSystemFont,Inter,Segoe UI,Roboto,sans-serif" font-size="13" fill="#8a97b8" text-anchor="start" font-weight="400">Share of (bot, round) awake/asleep predictions that came true, by rounds ahead.</text>
+<line x1="70" x2="920" y1="282.0" y2="282.0" stroke="#1d2742"/>
+<text x="60.0" y="286.0" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="11" fill="#56627f" text-anchor="end" font-weight="400">50%</text>
+<line x1="70" x2="920" y1="244.0" y2="244.0" stroke="#1d2742"/>
+<text x="60.0" y="248.0" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="11" fill="#56627f" text-anchor="end" font-weight="400">60%</text>
+<line x1="70" x2="920" y1="206.0" y2="206.0" stroke="#1d2742"/>
+<text x="60.0" y="210.0" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="11" fill="#56627f" text-anchor="end" font-weight="400">70%</text>
+<line x1="70" x2="920" y1="168.0" y2="168.0" stroke="#1d2742"/>
+<text x="60.0" y="172.0" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="11" fill="#56627f" text-anchor="end" font-weight="400">80%</text>
+<line x1="70" x2="920" y1="130.0" y2="130.0" stroke="#1d2742"/>
+<text x="60.0" y="134.0" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="11" fill="#56627f" text-anchor="end" font-weight="400">90%</text>
+<line x1="70" x2="920" y1="92.0" y2="92.0" stroke="#1d2742"/>
+<text x="60.0" y="96.0" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="11" fill="#56627f" text-anchor="end" font-weight="400">100%</text>
+<text x="70.0" y="308.0" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="11" fill="#56627f" text-anchor="middle" font-weight="400">1</text>
+<text x="147.3" y="308.0" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="11" fill="#56627f" text-anchor="middle" font-weight="400">2</text>
+<text x="224.5" y="308.0" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="11" fill="#56627f" text-anchor="middle" font-weight="400">3</text>
+<text x="301.8" y="308.0" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="11" fill="#56627f" text-anchor="middle" font-weight="400">4</text>
+<text x="379.1" y="308.0" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="11" fill="#56627f" text-anchor="middle" font-weight="400">5</text>
+<text x="456.4" y="308.0" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="11" fill="#56627f" text-anchor="middle" font-weight="400">6</text>
+<text x="533.6" y="308.0" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="11" fill="#56627f" text-anchor="middle" font-weight="400">7</text>
+<text x="610.9" y="308.0" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="11" fill="#56627f" text-anchor="middle" font-weight="400">8</text>
+<text x="688.2" y="308.0" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="11" fill="#56627f" text-anchor="middle" font-weight="400">9</text>
+<text x="765.5" y="308.0" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="11" fill="#56627f" text-anchor="middle" font-weight="400">10</text>
+<text x="842.7" y="308.0" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="11" fill="#56627f" text-anchor="middle" font-weight="400">11</text>
+<text x="920.0" y="308.0" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="11" fill="#56627f" text-anchor="middle" font-weight="400">12</text>
+<text x="495.0" y="324.0" font-family="-apple-system,BlinkMacSystemFont,Inter,Segoe UI,Roboto,sans-serif" font-size="11" fill="#56627f" text-anchor="middle" font-weight="400">rounds ahead</text>
+<polyline points="70.0,95.3 147.3,124.7 224.5,159.1 301.8,180.4 379.1,202.4 456.4,219.0 533.6,231.9 610.9,242.4 688.2,249.2 765.5,254.7 842.7,258.1 920.0,259.0" fill="none" stroke="#00a6c1" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="70.0" cy="95.3" r="4.5" fill="#00a6c1" stroke="#0c1324" stroke-width="2"/>
+<circle cx="147.3" cy="124.7" r="4.5" fill="#00a6c1" stroke="#0c1324" stroke-width="2"/>
+<circle cx="224.5" cy="159.1" r="4.5" fill="#00a6c1" stroke="#0c1324" stroke-width="2"/>
+<circle cx="301.8" cy="180.4" r="4.5" fill="#00a6c1" stroke="#0c1324" stroke-width="2"/>
+<circle cx="379.1" cy="202.4" r="4.5" fill="#00a6c1" stroke="#0c1324" stroke-width="2"/>
+<circle cx="456.4" cy="219.0" r="4.5" fill="#00a6c1" stroke="#0c1324" stroke-width="2"/>
+<circle cx="533.6" cy="231.9" r="4.5" fill="#00a6c1" stroke="#0c1324" stroke-width="2"/>
+<circle cx="610.9" cy="242.4" r="4.5" fill="#00a6c1" stroke="#0c1324" stroke-width="2"/>
+<circle cx="688.2" cy="249.2" r="4.5" fill="#00a6c1" stroke="#0c1324" stroke-width="2"/>
+<circle cx="765.5" cy="254.7" r="4.5" fill="#00a6c1" stroke="#0c1324" stroke-width="2"/>
+<circle cx="842.7" cy="258.1" r="4.5" fill="#00a6c1" stroke="#0c1324" stroke-width="2"/>
+<circle cx="920.0" cy="259.0" r="4.5" fill="#00a6c1" stroke="#0c1324" stroke-width="2"/>
+<text x="70.0" y="83.3" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="12" fill="#e6ecff" text-anchor="middle" font-weight="700">99%</text>
+<text x="379.1" y="190.4" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="12" fill="#e6ecff" text-anchor="middle" font-weight="700">71%</text>
+<text x="920.0" y="247.0" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="12" fill="#e6ecff" text-anchor="middle" font-weight="700">56%</text>
+</svg>
