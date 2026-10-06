@@ -247,6 +247,8 @@ const $ = (id) => document.getElementById(id);
 const NS = "http://www.w3.org/2000/svg";
 let lastOk = 0;
 
+/* The run is over: the arena says so (live), or the replay's last frame does. */
+function isFinal(s) { return !!((s.decision && s.decision.final) || (s.status && s.status.finished)); }
 function colorOf(team, us) { return team === us ? "var(--us)" : (COLORS[team] || "var(--other)"); }
 function rawOf(team, us) { return team === us ? RAW.us : (RAW[team] || "#9aa6c2"); }
 function short(team, us) { return team === us ? "us · " + team : team.replace(/^bot-/, ""); }
@@ -315,7 +317,7 @@ function drawBattery(s, teams) {
   // The plan: the DP's projected battery from this round to the end.
   const d = s.decision || {};
   $("plan-tag").textContent = "";
-  if (d.plan_battery && d.plan_battery.length > 1) {
+  if (!isFinal(s) && d.plan_battery && d.plan_battery.length > 1) {
     const pts = d.plan_battery.map((b, i) => [x(d.round - 1 + i), y(b)]);
     el("polyline", { points: pts.map((p) => p.join(",")).join(" "), fill: "none", stroke: RAW.us,
       "stroke-width": 2, "stroke-dasharray": "6 5", opacity: 0.75 }, svg);
@@ -416,7 +418,7 @@ function drawRace(s, teams) {
 function drawPools(s, teams) {
   const d = s.decision || {};
   const box = $("pools"); box.innerHTML = "";
-  if (d.final) { drawFinal(s, teams); return; }
+  if (isFinal(s)) { drawFinal(s, teams); return; }
   const bids = Object.assign({}, d.predicted_bids || {});
   if (d.bid) bids[s.team] = d.bid;
   const order = teams.filter((t) => bids[t]);
@@ -515,7 +517,7 @@ function drawKpis(s) {
   const best = bots.reduce((a, r) => (r.score > (a ? a.score : -1) ? r : a), null);
   const total = st.total_rounds || 0;
   const rnd = d.round || st.round || 0;
-  $("round").innerHTML = total && rnd > total ? `FINAL <small>/ ${total} rounds</small>` : `R ${rnd} <small>/ ${total}</small>`;
+  $("round").innerHTML = isFinal(s) || (total && rnd > total) ? `FINAL <small>/ ${total} rounds</small>` : `R ${rnd} <small>/ ${total}</small>`;
   $("prog").style.width = total ? (100 * Math.min(rnd, total)) / total + "%" : "0";
   $("team").textContent = s.team || "-";
   $("scenario").textContent = st.scenario || "-";

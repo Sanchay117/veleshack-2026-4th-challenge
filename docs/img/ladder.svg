@@ -2,50 +2,50 @@
 <rect width="960" height="488" rx="14" fill="#0c1324"/>
 <text x="28.0" y="38.0" font-family="-apple-system,BlinkMacSystemFont,Inter,Segoe UI,Roboto,sans-serif" font-size="19" fill="#e6ecff" text-anchor="start" font-weight="700">Score over the template, same seeds and devices</text>
 <text x="28.0" y="62.0" font-family="-apple-system,BlinkMacSystemFont,Inter,Segoe UI,Roboto,sans-serif" font-size="13" fill="#8a97b8" text-anchor="start" font-weight="400">160 graded runs per strategy (seeds 1000-1039, 4 devices). Bar = mean, tick = worst run.</text>
-<line x1="370.9" x2="370.9" y1="84" y2="454" stroke="#1d2742" stroke-width="1"/>
-<text x="370.9" y="472.0" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="11" fill="#56627f" text-anchor="middle" font-weight="400">-20%</text>
-<line x1="446.2" x2="446.2" y1="84" y2="454" stroke="#1d2742" stroke-width="1"/>
-<text x="446.2" y="472.0" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="11" fill="#56627f" text-anchor="middle" font-weight="400">-10%</text>
-<line x1="521.4" x2="521.4" y1="84" y2="454" stroke="#1d2742" stroke-width="1"/>
-<text x="521.4" y="472.0" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="11" fill="#56627f" text-anchor="middle" font-weight="400">0</text>
-<line x1="596.7" x2="596.7" y1="84" y2="454" stroke="#1d2742" stroke-width="1"/>
-<text x="596.7" y="472.0" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="11" fill="#56627f" text-anchor="middle" font-weight="400">+10%</text>
-<line x1="672.0" x2="672.0" y1="84" y2="454" stroke="#1d2742" stroke-width="1"/>
-<text x="672.0" y="472.0" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="11" fill="#56627f" text-anchor="middle" font-weight="400">+20%</text>
-<line x1="747.2" x2="747.2" y1="84" y2="454" stroke="#1d2742" stroke-width="1"/>
-<text x="747.2" y="472.0" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="11" fill="#56627f" text-anchor="middle" font-weight="400">+30%</text>
-<line x1="822.5" x2="822.5" y1="84" y2="454" stroke="#1d2742" stroke-width="1"/>
-<text x="822.5" y="472.0" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="11" fill="#56627f" text-anchor="middle" font-weight="400">+40%</text>
+<line x1="367.9" x2="367.9" y1="84" y2="454" stroke="#1d2742" stroke-width="1"/>
+<text x="367.9" y="472.0" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="11" fill="#56627f" text-anchor="middle" font-weight="400">-20%</text>
+<line x1="443.0" x2="443.0" y1="84" y2="454" stroke="#1d2742" stroke-width="1"/>
+<text x="443.0" y="472.0" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="11" fill="#56627f" text-anchor="middle" font-weight="400">-10%</text>
+<line x1="518.1" x2="518.1" y1="84" y2="454" stroke="#1d2742" stroke-width="1"/>
+<text x="518.1" y="472.0" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="11" fill="#56627f" text-anchor="middle" font-weight="400">0</text>
+<line x1="593.2" x2="593.2" y1="84" y2="454" stroke="#1d2742" stroke-width="1"/>
+<text x="593.2" y="472.0" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="11" fill="#56627f" text-anchor="middle" font-weight="400">+10%</text>
+<line x1="668.3" x2="668.3" y1="84" y2="454" stroke="#1d2742" stroke-width="1"/>
+<text x="668.3" y="472.0" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="11" fill="#56627f" text-anchor="middle" font-weight="400">+20%</text>
+<line x1="743.4" x2="743.4" y1="84" y2="454" stroke="#1d2742" stroke-width="1"/>
+<text x="743.4" y="472.0" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="11" fill="#56627f" text-anchor="middle" font-weight="400">+30%</text>
+<line x1="818.4" x2="818.4" y1="84" y2="454" stroke="#1d2742" stroke-width="1"/>
+<text x="818.4" y="472.0" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="11" fill="#56627f" text-anchor="middle" font-weight="400">+40%</text>
 <text x="316.0" y="111.0" font-family="-apple-system,BlinkMacSystemFont,Inter,Segoe UI,Roboto,sans-serif" font-size="13" fill="#8a97b8" text-anchor="end" font-weight="400">template (naive-max)</text>
-<rect x="521.4" y="96" width="2.0" height="24" rx="4" fill="#4a5677"/>
-<line x1="521.4" x2="521.4" y1="93" y2="123" stroke="#e6ecff" stroke-width="2" opacity="0.75"/>
-<text x="531.4" y="113.0" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="13" fill="#e6ecff" text-anchor="start" font-weight="700">+0.0%</text>
+<rect x="518.1" y="96" width="2.0" height="24" rx="4" fill="#4a5677"/>
+<line x1="518.1" x2="518.1" y1="93" y2="123" stroke="#e6ecff" stroke-width="2" opacity="0.75"/>
+<text x="528.1" y="113.0" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="13" fill="#e6ecff" text-anchor="start" font-weight="700">+0.0%</text>
 <text x="316.0" y="155.0" font-family="-apple-system,BlinkMacSystemFont,Inter,Segoe UI,Roboto,sans-serif" font-size="13" fill="#8a97b8" text-anchor="end" font-weight="400">even-split bot</text>
-<rect x="488.1" y="140" width="33.3" height="24" rx="4" fill="#4a5677"/>
-<line x1="367.6" x2="367.6" y1="137" y2="167" stroke="#e6ecff" stroke-width="2" opacity="0.75"/>
-<text x="531.4" y="157.0" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="13" fill="#e6ecff" text-anchor="start" font-weight="700">-4.4%</text>
+<rect x="489.9" y="140" width="28.2" height="24" rx="4" fill="#4a5677"/>
+<line x1="367.5" x2="367.5" y1="137" y2="167" stroke="#e6ecff" stroke-width="2" opacity="0.75"/>
+<text x="528.1" y="157.0" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="13" fill="#e6ecff" text-anchor="start" font-weight="700">-3.8%</text>
 <text x="316.0" y="199.0" font-family="-apple-system,BlinkMacSystemFont,Inter,Segoe UI,Roboto,sans-serif" font-size="13" fill="#8a97b8" text-anchor="end" font-weight="400">proportional bot</text>
-<rect x="521.4" y="184" width="2.0" height="24" rx="4" fill="#4a5677"/>
-<line x1="400.7" x2="400.7" y1="181" y2="211" stroke="#e6ecff" stroke-width="2" opacity="0.75"/>
-<text x="531.7" y="201.0" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="13" fill="#e6ecff" text-anchor="start" font-weight="700">+0.0%</text>
+<rect x="518.1" y="184" width="46.1" height="24" rx="4" fill="#4a5677"/>
+<line x1="395.3" x2="395.3" y1="181" y2="211" stroke="#e6ecff" stroke-width="2" opacity="0.75"/>
+<text x="574.2" y="201.0" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="13" fill="#e6ecff" text-anchor="start" font-weight="700">+6.1%</text>
 <text x="316.0" y="243.0" font-family="-apple-system,BlinkMacSystemFont,Inter,Segoe UI,Roboto,sans-serif" font-size="13" fill="#8a97b8" text-anchor="end" font-weight="400">exact best response, no battery</text>
-<rect x="521.4" y="228" width="54.2" height="24" rx="4" fill="#4a5677"/>
-<line x1="472.4" x2="472.4" y1="225" y2="255" stroke="#e6ecff" stroke-width="2" opacity="0.75"/>
-<text x="585.6" y="245.0" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="13" fill="#e6ecff" text-anchor="start" font-weight="700">+7.2%</text>
+<rect x="518.1" y="228" width="58.3" height="24" rx="4" fill="#4a5677"/>
+<line x1="495.3" x2="495.3" y1="225" y2="255" stroke="#e6ecff" stroke-width="2" opacity="0.75"/>
+<text x="586.4" y="245.0" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="13" fill="#e6ecff" text-anchor="start" font-weight="700">+7.8%</text>
 <text x="316.0" y="287.0" font-family="-apple-system,BlinkMacSystemFont,Inter,Segoe UI,Roboto,sans-serif" font-size="13" fill="#8a97b8" text-anchor="end" font-weight="400">battery taper + floors (strong heuristic)</text>
-<rect x="521.4" y="272" width="140.1" height="24" rx="4" fill="#4a5677"/>
-<line x1="421.0" x2="421.0" y1="269" y2="299" stroke="#e6ecff" stroke-width="2" opacity="0.75"/>
-<text x="671.6" y="289.0" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="13" fill="#e6ecff" text-anchor="start" font-weight="700">+18.6%</text>
+<rect x="518.1" y="272" width="150.1" height="24" rx="4" fill="#4a5677"/>
+<line x1="409.5" x2="409.5" y1="269" y2="299" stroke="#e6ecff" stroke-width="2" opacity="0.75"/>
+<text x="678.2" y="289.0" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="13" fill="#e6ecff" text-anchor="start" font-weight="700">+20.0%</text>
 <text x="316.0" y="331.0" font-family="-apple-system,BlinkMacSystemFont,Inter,Segoe UI,Roboto,sans-serif" font-size="13" fill="#e6ecff" text-anchor="end" font-weight="400">ours, without the opponent model</text>
-<rect x="521.4" y="316" width="226.4" height="24" rx="4" fill="#2f7d8c"/>
-<line x1="552.4" x2="552.4" y1="313" y2="343" stroke="#e6ecff" stroke-width="2" opacity="0.75"/>
-<text x="757.8" y="333.0" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="13" fill="#e6ecff" text-anchor="start" font-weight="700">+30.1%</text>
+<rect x="518.1" y="316" width="233.1" height="24" rx="4" fill="#2f7d8c"/>
+<line x1="582.1" x2="582.1" y1="313" y2="343" stroke="#e6ecff" stroke-width="2" opacity="0.75"/>
+<text x="761.2" y="333.0" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="13" fill="#e6ecff" text-anchor="start" font-weight="700">+31.0%</text>
 <text x="316.0" y="375.0" font-family="-apple-system,BlinkMacSystemFont,Inter,Segoe UI,Roboto,sans-serif" font-size="13" fill="#e6ecff" text-anchor="end" font-weight="400">ours, without the battery plan</text>
-<rect x="521.4" y="360" width="222.2" height="24" rx="4" fill="#2f7d8c"/>
-<line x1="570.7" x2="570.7" y1="357" y2="387" stroke="#e6ecff" stroke-width="2" opacity="0.75"/>
-<text x="753.6" y="377.0" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="13" fill="#e6ecff" text-anchor="start" font-weight="700">+29.5%</text>
+<rect x="518.1" y="360" width="227.0" height="24" rx="4" fill="#2f7d8c"/>
+<line x1="576.7" x2="576.7" y1="357" y2="387" stroke="#e6ecff" stroke-width="2" opacity="0.75"/>
+<text x="755.1" y="377.0" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="13" fill="#e6ecff" text-anchor="start" font-weight="700">+30.2%</text>
 <text x="316.0" y="419.0" font-family="-apple-system,BlinkMacSystemFont,Inter,Segoe UI,Roboto,sans-serif" font-size="13" fill="#e6ecff" text-anchor="end" font-weight="700">ours: forecast + plan</text>
-<rect x="521.4" y="404" width="258.3" height="24" rx="4" fill="#00a6c1"/>
-<line x1="604.7" x2="604.7" y1="401" y2="431" stroke="#e6ecff" stroke-width="2" opacity="0.75"/>
-<text x="789.8" y="421.0" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="13" fill="#e6ecff" text-anchor="start" font-weight="700">+34.3%</text>
+<rect x="518.1" y="404" width="261.8" height="24" rx="4" fill="#00a6c1"/>
+<line x1="620.4" x2="620.4" y1="401" y2="431" stroke="#e6ecff" stroke-width="2" opacity="0.75"/>
+<text x="789.9" y="421.0" font-family="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace" font-size="13" fill="#e6ecff" text-anchor="start" font-weight="700">+34.9%</text>
 </svg>

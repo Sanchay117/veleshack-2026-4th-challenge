@@ -15,8 +15,10 @@ when its rivals will run flat, and plans its battery for the whole run.
 
 ![Score over the template](docs/img/ladder.svg)
 
-**+34.3% over the template**, ahead of all three bots in **160 of 160** graded
-runs on unseen seeds and four devices; worst run +11.1%; zero floor misses.
+**+34.9% over the template**, ahead of all three bots in **160 of 160** graded
+runs on unseen seeds and four devices; worst run +13.6%; 2 floor misses in
+9,600 rounds. On a live arena the opponent forecast matched the truth in 48 of
+48 decisions.
 
 ---
 
@@ -43,12 +45,12 @@ other. Out comes a rhythm no rule of thumb produces: sip energy in crowded
 rounds, spend it when rivals sleep, rest on purpose when they wake, and empty
 the battery on the last round.
 
-What did not work: re-scoring candidate bids with a fresh swarm rollout each
-(-1.2 points), and planning over sampled capacity futures (+0.4, within noise,
-at twice the compute). Both are switched off.
+What did not pay: re-scoring candidate bids with a fresh swarm rollout each,
+and planning over sampled capacity futures. Neither moved the score beyond
+noise, at twice the compute, so both are switched off.
 
 And yes, we take from the swarm. With us in the seat instead of the template,
-the bots lose 12.3% of their score while total swarm utility falls only 1.5%:
+the bots lose 12.2% of their score while total swarm utility falls only 1.4%:
 the gain is mostly redistribution.
 
 ---
@@ -91,6 +93,13 @@ the gain is mostly redistribution.
   bidding and fetching results now back off exponentially with full jitter from
   60 ms and keep trying until the round actually closes. Under a 45% fault rate
   with 2-second rounds this took misses from 4 to 1 in 25 rounds.
+- **Every result is read.** The template loop asks only for the result of the
+  round it has just bid in, which has not settled; by the time it has, the
+  loop is bidding in the next one. It read 1 result in 49 live rounds. Results
+  are now owed per round and read once the round is over (46 of 49). The
+  baseline bots run that same loop, so their history is almost always stale,
+  and the opponent model learns which past result the proportional bot is
+  really using.
 - **A bid can never be over budget.** Rounding to six decimals after scaling
   could leave a bid 1.5e-6 over, past the arena's tolerance: a compromise
   penalty. Our bids round down (found by the unit tests, not by the arena).
@@ -114,38 +123,42 @@ four devices including our own, 160 runs per strategy. Reproduce with
 
 | Strategy in our seat | vs template | worst run | beats all 3 bots | rested | floor misses |
 |---|--:|--:|--:|--:|--:|
-| template (naive-max) | 0.0% | 0.0% | 0% | 18.6 | 1.32 |
-| even-split bot | -4.4% | -20.4% | 0% | 19.4 | 2.44 |
-| proportional bot | 0.0% | -16.0% | 0% | 17.6 | 2.37 |
-| exact best response, battery-blind | +7.2% | -6.5% | 14% | 18.9 | 0.00 |
-| battery taper + floors (strong heuristic) | +18.6% | -13.3% | 91% | 1.2 | 0.13 |
-| ours without the opponent model | +30.1% | +4.1% | 99% | 7.2 | 0.34 |
-| ours without the battery plan | +29.5% | +6.5% | 98% | 7.4 | 0.00 |
-| **ours** | **+34.3%** | **+11.1%** | **100%** | 7.4 | **0.00** |
+| template (naive-max) | 0.0% | 0.0% | 0% | 18.7 | 1.54 |
+| even-split bot | -3.8% | -20.1% | 0% | 19.5 | 2.54 |
+| proportional bot | +6.1% | -16.4% | 14% | 18.0 | 2.54 |
+| exact best response, battery-blind | +7.8% | -3.0% | 8% | 18.9 | 0.05 |
+| battery taper + floors (strong heuristic) | +20.0% | -14.5% | 88% | 1.4 | 0.23 |
+| ours without the opponent model | +31.0% | +8.5% | 99% | 7.2 | 0.44 |
+| ours without the battery plan | +30.2% | +7.8% | 97% | 7.4 | 0.01 |
+| **ours** | **+34.9%** | **+13.6%** | **100%** | 7.4 | **0.01** |
+
+The heuristic lands where the organisers place their reference agent ("about
+22% ahead"), which is a useful check that the simulator is faithful.
 
 **Each half earns its place.** Remove the opponent model or the battery plan
-and about five points go. The heuristic that most teams will converge on
-(taper energy by charge, buy floors with a margin) rests barely at all and still
-gets less than half our margin: not resting is not the same as resting well.
+and about four to five points go, and the worst run gets markedly worse. The
+heuristic that most teams will converge on (taper energy by charge, buy floors
+with a margin) rests barely at all and still gets less than two thirds of our
+margin: not resting is not the same as resting well.
 
 **The primer's "best response is worth ~2%" holds for the split, not the
-floors.** A battery-blind exact best response gets +7.2%, and most of that is
-buying both floors at the exact minimum (1.32 misses per run to 0.00), which
+floors.** A battery-blind exact best response gets +7.8%, and much of that is
+buying both floors at the exact minimum (1.54 misses per run to 0.05), which
 needs the exact field that the shadows provide.
 
 ![Where the rounds go](docs/img/anatomy.svg)
 
-**Where the points come from.** We rest 7.5 rounds per run instead of 18.6,
-and those rests are scheduled: we spend 40.8 rounds in thin markets, with one
-or two bots asleep, against the template's 24.6. A thin round pays about 0.36
+**Where the points come from.** We rest 7.5 rounds per run instead of 18.7,
+and those rests are scheduled: we spend 40.4 rounds in thin markets, with one
+or two bots asleep, against the template's 24.3. A thin round pays about 0.36
 against 0.23 for a crowded one. The rare round with every bot asleep pays
-0.99, four times a crowded round.
+0.96, four times a crowded round.
 
 ![Nap forecast accuracy](docs/img/forecast.svg)
 
 **How far ahead the swarm is predictable.** Almost perfectly one round ahead
 (99%), because batteries are public and this round's market is known. Beyond
-that, the unknown capacity draws blur the bots' drain; accuracy falls to 71%
+that, the unknown capacity draws blur the bots' drain; accuracy falls to 72%
 at five rounds. The plan is re-solved every
 round, so it only ever acts on the near, accurate part.
 
@@ -156,12 +169,12 @@ round, so it only ever acts on the near, accurate part.
 
 | Condition | template | heuristic | ours | ours, worst run |
 |---|--:|--:|--:|--:|
-| graded, as published | 0.0% | +18.2% | +34.6% | +17.7% |
-| battery drains 50% faster, recharges 32% slower | 0.0% | +29.7% | +52.9% | +17.5% |
-| battery drains 33% slower | 0.0% | +9.6% | +23.7% | +7.6% |
-| an unknown extra agent in the swarm | 0.0% | +16.4% | +38.9% | +20.4% |
-| joins the run at round 12 | 0.0% | +19.6% | +34.9% | +15.5% |
-| practice scenario (40 rounds, 6 s) | 0.0% | +21.2% | +34.6% | +12.0% |
+| graded, as published | 0.0% | +19.8% | +36.9% | +17.7% |
+| battery drains 50% faster, recharges 32% slower | 0.0% | +29.1% | +46.4% | +19.8% |
+| battery drains 33% slower | 0.0% | +10.4% | +23.9% | +10.2% |
+| an unknown extra agent in the swarm | 0.0% | +17.7% | +38.8% | +14.5% |
+| joins the run at round 12 | 0.0% | +21.4% | +35.8% | +8.2% |
+| practice scenario (40 rounds, 6 s) | 0.0% | +22.5% | +35.5% | +11.8% |
 
 The physics constants are not published to agents; the agent starts from the
 scenario defaults and re-fits the drain rate from its own round results and
@@ -171,16 +184,16 @@ the recharge rate from its own rests.
 
 | | with the template | with ours |
 |---|--:|--:|
-| our score | 13.57 | 18.25 |
-| the three bots, total | 44.64 | 39.14 (-12.3%) |
-| whole swarm, total utility | 58.20 | 57.31 (-1.5%) |
-| log social welfare per round | -3.09 | -3.21 |
+| our score | 13.50 | 18.15 |
+| the three bots, total | 44.81 | 39.35 (-12.2%) |
+| whole swarm, total utility | 58.31 | 57.49 (-1.4%) |
+| log social welfare per round | -3.08 | -3.20 |
 
 We did not make the swarm better off; we made ourselves better off, mostly at
 the bots' expense. Two mechanisms: we crowd into the thin rounds the bots
 would otherwise share among fewer nodes, and by drawing little energy we leave
 more of the energy pool to the bots, who drain faster and sleep more: with us
-in the seat the three bots rest 63.6 rounds per run between them, against 57.1
+in the seat the three bots rest 63.4 rounds per run between them, against 56.9
 with the template (+11%, 40 runs). In the full CoGNETs pipeline the
 Stage 1 bargaining prices exist to align individual and collective outcomes;
 publishing realised prices instead, as this reduction does, removes that
