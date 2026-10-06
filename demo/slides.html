@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1920, initial-scale=1">
+<title>Demo Slides</title>
+<!--
+  Slides for the demo video, one per scene, rendered at 1920x1080 by
+  demo/film.py (open slides.html#title, #problem, ... to view one).
+  Copyright 2026 Sanchay Singh. SPDX-License-Identifier: Apache-2.0
+-->
+<style>
+:root {
+  --bg: #070b16; --bg2: #0c1324; --panel: rgba(18, 27, 48, 0.78); --line: rgba(120, 150, 210, 0.16);
+  --text: #e6ecff; --muted: #8a97b8; --dim: #56627f;
+  --us: #00a6c1; --naive: #c88100; --even: #9f78e9; --prop: #f04e7e; --bad: #ff5c6c; --good: #3ee08f;
+  --compute: #4f8dff; --energy: #ffcc33; --security: #3ee08f;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --sans: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; }
+body {
+  background:
+    radial-gradient(1400px 700px at 10% -10%, rgba(0, 166, 193, 0.16), transparent 60%),
+    radial-gradient(1100px 600px at 100% 0%, rgba(159, 120, 233, 0.13), transparent 60%),
+    linear-gradient(180deg, var(--bg2), var(--bg));
+  color: var(--text); font-family: var(--sans);
+}
+body::before {
+  content: ""; position: fixed; inset: 0; pointer-events: none;
+  background-image: linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--line) 1px, transparent 1px);
+  background-size: 64px 64px; mask-image: radial-gradient(ellipse at 50% 0%, black 0%, transparent 80%); opacity: 0.45;
+}
+section { display: none; position: absolute; inset: 0; padding: 96px 120px; flex-direction: column; }
+section:target { display: flex; }
+.kicker { font: 700 22px var(--mono); letter-spacing: 0.22em; text-transform: uppercase; color: var(--us); }
+h1 { font-size: 76px; line-height: 1.05; margin: 18px 0 0; letter-spacing: -0.02em; font-weight: 800; }
+h1 em { font-style: normal; color: var(--us); }
+.lede { font-size: 32px; color: var(--muted); margin-top: 22px; max-width: 1400px; line-height: 1.35; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 22px; padding: 30px 34px; }
+.mono { font-family: var(--mono); }
+.brand { position: absolute; right: 120px; bottom: 64px; display: flex; gap: 14px; align-items: center; color: var(--dim); font: 600 20px var(--mono); }
+.logo { width: 44px; height: 44px; border-radius: 12px; position: relative;
+  background: conic-gradient(from 200deg, var(--us), var(--even), var(--prop), var(--naive), var(--us)); }
+.logo::after { content: ""; position: absolute; inset: 7px; border-radius: 7px; background: var(--bg2); }
+
+/* title */
+#title { justify-content: center; }
+#title h1 { font-size: 150px; }
+#title .chips { display: flex; gap: 16px; margin-top: 56px; flex-wrap: wrap; }
+.chip { border: 1px solid var(--line); background: rgba(10,16,30,0.6); padding: 14px 24px; border-radius: 999px; font: 600 24px var(--mono); color: var(--muted); }
+.chip b { color: var(--text); }
+.biglogo { width: 120px; height: 120px; border-radius: 30px; margin-bottom: 40px; position: relative;
+  background: conic-gradient(from 200deg, var(--us), var(--even), var(--prop), var(--naive), var(--us));
+  box-shadow: 0 0 80px rgba(0,166,193,0.45); }
+.biglogo::after { content: "∿"; position: absolute; inset: 14px; border-radius: 18px; background: var(--bg2);
+  display: grid; place-items: center; font: 700 52px var(--mono); color: var(--us); }
+
+/* problem */
+.row { display: flex; gap: 28px; margin-top: 56px; }
+.pool { flex: 1; }
+.pool .name { font: 700 22px var(--mono); letter-spacing: 0.14em; text-transform: uppercase; }
+.pool .bar { height: 18px; border-radius: 9px; margin-top: 18px; display: flex; overflow: hidden; gap: 3px; }
+.pool .bar div { height: 100%; border-radius: 4px; }
+.formula { font: 600 34px var(--mono); color: var(--text); margin-top: 26px; }
+.formula small { display: block; color: var(--dim); font-size: 20px; margin-top: 8px; font-weight: 500; }
+.trap { flex: 1; border-color: rgba(255, 92, 108, 0.35); background: linear-gradient(135deg, rgba(255,92,108,0.10), rgba(18,27,48,0.78)); }
+.trap .t { font: 800 34px var(--sans); }
+.trap .d { font-size: 26px; color: var(--muted); margin-top: 10px; line-height: 1.35; }
+.foot { margin-top: auto; font-size: 32px; color: var(--muted); }
+.foot b { color: var(--text); }
+
+/* compute */
+.facts { display: grid; grid-template-columns: repeat(3, 1fr); gap: 26px; margin-top: 54px; }
+.fact .n { font: 800 22px var(--mono); color: var(--us); }
+.fact .t { font-size: 32px; font-weight: 700; margin-top: 10px; line-height: 1.2; }
+.fact .d { font-size: 22px; color: var(--muted); margin-top: 10px; font-family: var(--mono); }
+.arrow { font-size: 48px; color: var(--dim); text-align: center; margin: 22px 0 6px; }
+.outcomes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 26px; }
+.big { font: 800 64px var(--mono); color: var(--us); letter-spacing: -0.02em; }
+.big.good { color: var(--good); }
+.sub { font-size: 24px; color: var(--muted); margin-top: 6px; line-height: 1.3; }
+
+/* plan */
+.split { display: grid; grid-template-columns: 1.15fr 1fr; gap: 34px; margin-top: 46px; align-items: start; }
+.split img { width: 100%; border-radius: 18px; border: 1px solid var(--line); display: block; }
+.stack { display: flex; flex-direction: column; gap: 22px; }
+.eq { font: 600 30px var(--mono); line-height: 1.6; }
+.eq .k { color: var(--us); }
+.eq .c { color: var(--dim); font-size: 22px; }
+.rhythm { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 26px; }
+.rhythm div { border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; font-size: 24px; background: rgba(5,10,22,0.45); }
+.rhythm b { color: var(--us); }
+
+/* results */
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 26px; margin-top: 40px; }
+.results-img { margin-top: 28px; width: 100%; border-radius: 18px; border: 1px solid var(--line); max-height: 470px; object-fit: contain; object-position: center; background: #0c1324; }
+.honest { margin-top: 24px; font-size: 28px; color: var(--muted); }
+.honest b { color: var(--text); }
+
+/* close */
+#close { justify-content: center; }
+.checks { display: grid; grid-template-columns: repeat(3, 1fr); gap: 26px; margin-top: 60px; }
+.cmd { margin-top: 40px; font: 600 34px var(--mono); color: var(--text); background: rgba(5,10,22,0.6); border: 1px solid var(--line); border-radius: 16px; padding: 22px 28px; display: inline-block; }
+.cmd span { color: var(--dim); }
+</style>
+</head>
+<body>
+
+<!-- 1 ---------------------------------------------------------------- -->
+<section id="title">
+  <div class="biglogo"></div>
+  <div class="kicker">VelesHack 2026 · Challenge 4 · CoGNETs</div>
+  <h1>Forecast. Plan. <em>Bid.</em></h1>
+  <div class="lede">An edge-node agent that computes the market instead of guessing it.</div>
+  <div class="chips">
+    <div class="chip">team <b>NullPointerException</b></div>
+    <div class="chip">Smart Edge Resource Auctions</div>
+    <div class="chip">Kelly mechanism · CES utility · battery DP</div>
+  </div>
+</section>
+
+<!-- 2 ---------------------------------------------------------------- -->
+<section id="problem">
+  <div class="kicker">The arena</div>
+  <h1>Four nodes. Three pools. <em>One battery each.</em></h1>
+  <div class="row">
+    <div class="card pool">
+      <div class="name" style="color:var(--compute)">compute</div>
+      <div class="bar"><div style="flex:4;background:var(--us)"></div><div style="flex:3;background:var(--naive)"></div><div style="flex:3;background:var(--even)"></div><div style="flex:2;background:var(--prop)"></div></div>
+      <div class="formula">x = C · b / Σb<small>your share follows your bid</small></div>
+    </div>
+    <div class="card pool">
+      <div class="name" style="color:var(--energy)">energy</div>
+      <div class="bar"><div style="flex:1;background:var(--us)"></div><div style="flex:4;background:var(--naive)"></div><div style="flex:4;background:var(--even)"></div><div style="flex:4;background:var(--prop)"></div></div>
+      <div class="formula">u = (Σ w·√x)²<small>balanced bundles score best</small></div>
+    </div>
+    <div class="card pool">
+      <div class="name" style="color:var(--security)">security</div>
+      <div class="bar"><div style="flex:4;background:var(--us)"></div><div style="flex:3;background:var(--naive)"></div><div style="flex:3;background:var(--even)"></div><div style="flex:3;background:var(--prop)"></div></div>
+      <div class="formula">Σ b ≤ W<small>a budget every round, use it or lose it</small></div>
+    </div>
+  </div>
+  <div class="row">
+    <div class="card trap"><div class="t">Miss a service floor</div><div class="d">Too little compute or security, and the round's score is halved. Miss both: quartered.</div></div>
+    <div class="card trap"><div class="t">The energy you win drains you</div><div class="d">Run your battery flat and you sit the next round out, scoring nothing at all.</div></div>
+  </div>
+  <div class="foot">The three baseline bots never notice: <b>a third of the run spent asleep.</b></div>
+</section>
+
+<!-- 3 ---------------------------------------------------------------- -->
+<section id="compute">
+  <div class="kicker">Insight 1</div>
+  <h1>Don't estimate the market. <em>Compute it.</em></h1>
+  <div class="facts">
+    <div class="card fact"><div class="n">01 · public</div><div class="t">The bots are open source</div><div class="d">baselines/bot.py</div></div>
+    <div class="card fact"><div class="n">02 · public</div><div class="t">They run on a copy of our device</div><div class="d">same weights, floors, battery</div></div>
+    <div class="card fact"><div class="n">03 · public</div><div class="t">Every node's battery, every round</div><div class="d">GET /v1/swarm</div></div>
+  </div>
+  <div class="arrow">↓ replay their logic on public data ↓</div>
+  <div class="outcomes">
+    <div class="card"><div class="big">6 dp</div><div class="sub">their bids reproduced to six decimals, checked against the clearing price</div></div>
+    <div class="card"><div class="big good">48 / 48</div><div class="sub">decisions matched on a live arena, injected faults and all</div></div>
+    <div class="card"><div class="big">2 / 9,600</div><div class="sub">rounds with a missed floor: both floors bought at the exact minimum</div></div>
+  </div>
+</section>
+
+<!-- 4 ---------------------------------------------------------------- -->
+<section id="plan">
+  <div class="kicker">Insight 2</div>
+  <h1>Their naps are predictable. <em>Plan around them.</em></h1>
+  <div class="split">
+    <div class="stack">
+      <img src="../docs/img/battery.svg" alt="Battery traces in one run: the bots crash early, ours follows a planned rhythm">
+      <img src="../docs/img/forecast.svg" alt="Nap forecast accuracy by rounds ahead: 99% one round ahead, 82% three rounds ahead">
+    </div>
+    <div>
+      <div class="card eq">
+        <div><span class="k">V<sub>t</sub>(B)</span> = max<sub>a</sub> [ u<sub>t</sub>(a) + V<sub>t+1</sub>(B − d<sub>a</sub>) ]</div>
+        <div class="c">value of charge B, rounds t … 60; resting refills r</div>
+        <div class="c">re-solved every round, ~50 ms</div>
+      </div>
+      <div class="rhythm">
+        <div><b>sip</b> energy when the pools are crowded</div>
+        <div><b>spend</b> it when rivals sleep</div>
+        <div><b>rest</b> on purpose when they wake</div>
+        <div><b>empty</b> the battery on the last round</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 6 ---------------------------------------------------------------- -->
+<section id="results">
+  <div class="kicker">160 graded runs · unseen seeds · 4 devices</div>
+  <h1>Ahead of every bot, <em>every run.</em></h1>
+  <div class="stats">
+    <div class="card"><div class="big">+34.9%</div><div class="sub">mean score over the template</div></div>
+    <div class="card"><div class="big good">160 / 160</div><div class="sub">runs ahead of all three bots</div></div>
+    <div class="card"><div class="big">+13.6%</div><div class="sub">over the template in the worst run</div></div>
+  </div>
+  <img class="results-img" src="../docs/img/ladder.svg" alt="Score over the template by strategy">
+  <div class="honest">Welfare, honestly: the bots lose <b>12.2%</b>, the whole swarm <b>1.4%</b>. We mostly take from the bots.</div>
+</section>
+
+<!-- 7 ---------------------------------------------------------------- -->
+<section id="close">
+  <div class="kicker">Team NullPointerException</div>
+  <h1>Forecast. Plan. <em>Bid.</em></h1>
+  <div class="checks">
+    <div class="card"><div class="big good">8 / 8</div><div class="sub">organisers' conformance checks, in Docker</div></div>
+    <div class="card"><div class="big good">30 / 30</div><div class="sub">functional · 0 missed rounds</div></div>
+    <div class="card"><div class="big good">20 / 20</div><div class="sub">resilience · injected 503s and 429s</div></div>
+  </div>
+  <div><div class="cmd"><span>$</span> python lab/experiments.py <span># every number, reproduced</span></div></div>
+</section>
+
+<div class="brand"><div class="logo"></div>NullPointerException</div>
+</body>
+</html>

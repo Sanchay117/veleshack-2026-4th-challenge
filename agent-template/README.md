@@ -32,6 +32,7 @@ ARENA_URL=http://localhost:8080 TEAM_NAME=NullPointerException python agent.py
 | `TEAM_NAME` | `unnamed-team` | decides the device profile; ours is `NullPointerException` |
 | `LOG_LEVEL` | `INFO` | `DEBUG` adds every HTTP request |
 | `TELEMETRY_PORT` | unset (off) | serve the dashboard and `/api/state` on this port |
+| `TELEMETRY_LINGER` | `600` | with telemetry on, seconds the dashboard stays up after the run |
 
 ## A decision, as logged
 

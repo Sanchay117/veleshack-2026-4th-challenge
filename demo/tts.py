@@ -29,8 +29,9 @@ def speak(text: str, out: Path, voice: str = VOICE, model: str = MODEL,
     key = os.environ.get("OPENROUTER_API_KEY", "").strip()
     if not key:
         raise SystemExit("set OPENROUTER_API_KEY")
-    body = {"model": model, "input": text, "voice": voice,
-            "response_format": "mp3", "speed": speed}
+    body = {"model": model, "input": text, "voice": voice, "response_format": "mp3"}
+    if speed != 1.0:
+        body["speed"] = speed   # not every provider accepts it (Deepgram Flux does not)
     for attempt in range(attempts):
         r = httpx.post(URL, json=body, timeout=120,
                        headers={"Authorization": f"Bearer {key}"})

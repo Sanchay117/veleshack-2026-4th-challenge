@@ -1,0 +1,41 @@
+{
+  "voice": "flux-marcus-en",
+  "tempo": 1.06,
+  "scenes": [
+    {
+      "id": "title",
+      "visual": "slide",
+      "text": "We're team NullPointerException, and this is our agent for challenge four: smart edge resource auctions. It doesn't guess the market. It computes it."
+    },
+    {
+      "id": "problem",
+      "visual": "slide",
+      "text": "Every round, four edge nodes split a budget across three pools: compute, energy and security. There are two traps. Miss a service floor, and the round is halved. And the energy you win drains your own battery. Run flat, and you sit the round out, scoring nothing. The three baseline bots never notice. They spend a third of the run asleep."
+    },
+    {
+      "id": "compute",
+      "visual": "slide",
+      "text": "Our first insight: this market isn't hidden. The bots are open source, they run on a copy of our device, and the arena publishes every node's battery. So each round we replay their logic on the public data, and reproduce their bids to six decimal places, checked against the clearing price: forty-eight out of forty-eight on a live arena. Knowing the field exactly, we buy both service floors at the exact minimum."
+    },
+    {
+      "id": "plan",
+      "visual": "slide",
+      "text": "Second: the bots never manage their batteries, so their naps are predictable. We roll them forward, and know who sleeps next round ninety-nine percent of the time. That forecast feeds a dynamic programme over our own battery for the rest of the run. It sips energy when the pools are crowded, spends it when rivals sleep, rests on purpose when they wake, and empties the battery on the final round."
+    },
+    {
+      "id": "live",
+      "visual": "live",
+      "text": "Here it is live: the real arena, the hostile graded scenario, injected faults and all. The thick cyan line is our battery, and the dashed line is our plan, solved again every round. Below it, every node's naps, past and forecast. On the right, this round's market, known before we bid. Watch the bots run themselves flat while we hold our charge. Then the rhythm: we rest while they're awake, and play while they sleep. This run is one of our better ones. Here's the average."
+    },
+    {
+      "id": "results",
+      "visual": "slide",
+      "text": "Across one hundred and sixty graded runs, on seeds we never tuned on and four different devices, we score thirty-five percent above the template, finish ahead of all three bots in every single run, and stay fourteen percent ahead even in the worst one. A strong heuristic gets twenty. And the honest welfare answer: we mostly take from the bots. The whole swarm's utility barely moves."
+    },
+    {
+      "id": "close",
+      "visual": "slide",
+      "text": "It passes the organisers' conformance suite with full marks, and every number you've seen is reproducible from the repository with one command. Forecast. Plan. Bid. Thank you."
+    }
+  ]
+}

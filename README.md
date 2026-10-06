@@ -214,6 +214,7 @@ make replay                        # a simulated run in the dashboard, no Docker
 python lab/sim.py --help           # compare strategies over many seeds
 python lab/experiments.py          # regenerate every number above
 python lab/charts.py               # and every figure
+python demo/film.py --help         # how the demo video was made (narration, slides, live capture)
 ```
 
 `lab/` needs the arena installed (`pip install -e .`) plus `numpy`; the agent

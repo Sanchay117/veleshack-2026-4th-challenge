@@ -23,6 +23,9 @@ conformance-*.json
 # ...except the measurements the README quotes, which are a deliverable.
 !docs/results/results.json
 
+# Demo video build output (rebuilt by demo/film.py)
+demo/out/
+
 # Editors / OS
 .claude/
 .vscode/

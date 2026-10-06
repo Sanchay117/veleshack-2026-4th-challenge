@@ -23,6 +23,7 @@ Configuration is environment only:
     TEAM_NAME        your team; decides your device     (default unnamed-team)
     LOG_LEVEL        DEBUG / INFO / WARNING             (default INFO)
     TELEMETRY_PORT   serve the dashboard on this port   (default off)
+    TELEMETRY_LINGER seconds to keep it up after the run (default 600; telemetry only)
 
 Copyright 2026 The CoGNETs Consortium, Sanchay Singh
 SPDX-License-Identifier: Apache-2.0
@@ -247,6 +248,11 @@ def run() -> int:
                 pass
             if telemetry:
                 _observe_board(client, total_rounds + 1, telemetry)
+                # Keep the dashboard up so the final standings can be seen.
+                # Only with telemetry on: a graded agent exits straight away.
+                linger = float(os.environ.get("TELEMETRY_LINGER", "600"))
+                LOG.info("run over; dashboard stays up for %.0fs (Ctrl-C to quit)", linger)
+                _stop.wait(linger)
             break
 
         _stop.wait(0.25)
