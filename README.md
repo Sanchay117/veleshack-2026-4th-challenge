@@ -132,8 +132,10 @@ four devices including our own, 160 runs per strategy. Reproduce with
 | ours without the battery plan | +30.2% | +7.8% | 97% | 7.4 | 0.01 |
 | **ours** | **+34.9%** | **+13.6%** | **100%** | 7.4 | **0.01** |
 
-The heuristic lands where the organisers place their reference agent ("about
-22% ahead"), which is a useful check that the simulator is faithful.
+Measured the way the organisers describe their reference agent, against the
+best of the three bots ("about 22% ahead of all three"), the heuristic is
++20.9% and ours +30.9%. The heuristic landing where their reference does is a
+useful check that the simulator is faithful.
 
 **Each half earns its place.** Remove the opponent model or the battery plan
 and about four to five points go, and the worst run gets markedly worse. The
