@@ -1,11 +1,13 @@
 {
-  "voice": "flux-marcus-en",
-  "tempo": 1.06,
+  "model": "fish-audio/s2.1-pro-free:free",
+  "voice": "933563129e564b19a115bedd57b7406a",
+  "voice_name": "Sarah (Fish Audio)",
+  "tempo": 1.0,
   "scenes": [
     {
       "id": "title",
       "visual": "slide",
-      "text": "We're team NullPointerException, and this is our agent for challenge four: smart edge resource auctions. It doesn't guess the market. It computes it."
+      "text": "We're team Null Pointer Exception, and this is our agent for challenge four: smart edge resource auctions. It doesn't guess the market. It computes it."
     },
     {
       "id": "problem",

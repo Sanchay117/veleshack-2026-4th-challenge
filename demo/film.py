@@ -68,7 +68,8 @@ def narrate(force: bool = False) -> None:
         if path.exists() and not force:
             continue
         raw = path.with_suffix(".raw.mp3")
-        speak(s["text"], raw, voice=SCRIPT.get("voice", "flux-marcus-en"))
+        speak(s["text"], raw, voice=SCRIPT.get("voice", "flux-marcus-en"),
+              model=SCRIPT.get("model", "deepgram/flux-tts"))
         # A touch faster, pitch preserved: the provider has no speed control.
         ff("-i", str(raw), "-filter:a", f"atempo={float(SCRIPT.get('tempo', 1.0)):.3f}",
            "-b:a", "192k", str(path))
@@ -194,7 +195,14 @@ def main() -> int:
     p = argparse.ArgumentParser()
     p.add_argument("step", choices=["narrate", "slides", "record", "assemble"])
     p.add_argument("--force", action="store_true", help="re-narrate cached scenes")
+    p.add_argument("--env-file", default=None,
+                   help="read KEY=VALUE lines (e.g. OPENROUTER_API_KEY) from this file")
     a = p.parse_args()
+    if a.env_file:
+        for line in Path(a.env_file).read_text().splitlines():
+            key, sep, value = line.strip().partition("=")
+            if sep and key and not key.startswith("#"):
+                os.environ.setdefault(key, value)
     {"narrate": lambda: narrate(a.force), "slides": slides, "record": record,
      "assemble": assemble}[a.step]()
     return 0
