@@ -15,7 +15,7 @@ PY ?= python3
 
 .DEFAULT_GOAL := help
 .PHONY: help up down logs agent agent-logs check check-docker graded reset board \
-        status install dev-arena dev-bots dev-agent lint clean test sim replay demo
+        status install dev-arena dev-bots dev-agent lint clean test sim replay demo site
 
 ## ---------------------------------------------------------------- docker ---
 
@@ -102,6 +102,15 @@ replay:  ## Replay a simulated run in the dashboard on http://localhost:8090
 demo:  ## Live: arena + bots + our agent, dashboard on http://localhost:8090
 	$(COMPOSE) up -d --build arena bot-naive-max bot-even-split bot-proportional
 	$(COMPOSE) --profile agent up --build agent
+
+site:  ## Build the project website into site/dist (deployed by .github/workflows/pages.yml)
+	rm -rf site/dist
+	mkdir -p site/dist/run site/dist/img site/dist/data
+	cp site/index.html site/dist/
+	cp site/img/* docs/img/*.svg site/dist/img/
+	cp site/data/live-run.json site/dist/data/
+	cp agent-template/dashboard/index.html site/dist/run/index.html
+	@echo "  site/dist ready. Preview: $(PY) -m http.server 8095 --directory site/dist"
 
 ## ------------------------------------------------------------------ chores ---
 

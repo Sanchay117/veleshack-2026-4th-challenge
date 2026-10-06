@@ -26,6 +26,9 @@ conformance-*.json
 # Demo video build output (rebuilt by demo/film.py)
 demo/out/
 
+# Website build output (rebuilt by make site)
+site/dist/
+
 # Editors / OS
 .claude/
 .vscode/

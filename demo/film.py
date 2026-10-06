@@ -124,6 +124,47 @@ def record(url: str = "http://localhost:8090", tail: float = 6.0, cap: float = 3
     print(f"{len(stamps)} frames over {stamps[-1]:.1f}s")
 
 
+def capture(url: str = "http://localhost:8090/api/state",
+            out: Path = HERE.parent / "site" / "data" / "live-run.json",
+            label: str = "", cap: float = 400.0) -> None:
+    """Save a live run's telemetry for the website's in-browser replay.
+
+    One frame per round (this round's decision, the leaderboard, the status);
+    the per-round history is stored once and cut to each frame's round by the
+    dashboard, which keeps the file small.
+    """
+    import httpx
+    frames: List[dict] = []
+    last_round, final, t0 = None, None, time.monotonic()
+    while time.monotonic() - t0 < cap:
+        try:
+            s = httpx.get(url, timeout=2.0).json()
+        except (httpx.HTTPError, ValueError):
+            time.sleep(0.5)
+            continue
+        d = s.get("decision") or {}
+        r = d.get("round")
+        done = bool((s.get("status") or {}).get("finished"))
+        if r and r != last_round and not done:
+            frames.append({"decision": d, "leaderboard": s.get("leaderboard"),
+                           "status": s.get("status")})
+            last_round = r
+        if done:
+            final = s
+            break
+        time.sleep(0.15)
+    if final is None:
+        raise SystemExit("the run did not finish within the cap")
+    frames.append({"decision": {"round": (final["status"].get("total_rounds") or 0) + 1,
+                                "final": True},
+                   "leaderboard": final.get("leaderboard"), "status": final.get("status")})
+    data = {"meta": {"label": label}, "team": final.get("team"),
+            "rounds": final.get("rounds"), "decisions": final.get("decisions"), "frames": frames}
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(data, separators=(",", ":"), default=float))
+    print(f"{len(frames)} frames, {out.stat().st_size // 1024} KB -> {out}")
+
+
 # ---------------------------------------------------------------------------
 def _segment_slide(scene: dict, audio: Path, out: Path) -> None:
     length = PAD_IN + duration(audio) + PAD_OUT
@@ -193,7 +234,8 @@ def assemble() -> Path:
 
 def main() -> int:
     p = argparse.ArgumentParser()
-    p.add_argument("step", choices=["narrate", "slides", "record", "assemble"])
+    p.add_argument("step", choices=["narrate", "slides", "record", "capture", "assemble"])
+    p.add_argument("--label", default="", help="capture: caption shown on the replay")
     p.add_argument("--force", action="store_true", help="re-narrate cached scenes")
     p.add_argument("--env-file", default=None,
                    help="read KEY=VALUE lines (e.g. OPENROUTER_API_KEY) from this file")
@@ -204,7 +246,7 @@ def main() -> int:
             if sep and key and not key.startswith("#"):
                 os.environ.setdefault(key, value)
     {"narrate": lambda: narrate(a.force), "slides": slides, "record": record,
-     "assemble": assemble}[a.step]()
+     "capture": lambda: capture(label=a.label), "assemble": assemble}[a.step]()
     return 0
 
 

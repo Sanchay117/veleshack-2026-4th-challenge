@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Forecast, Plan, Bid</title>
+<meta name="description" content="An edge-node agent for the CoGNETs Swarm Arena that computes the market instead of guessing it. VelesHack 2026, Challenge 4, team NullPointerException.">
+<meta property="og:title" content="Forecast, Plan, Bid: CoGNETs Edge Auction Agent">
+<meta property="og:description" content="Replays rival bots exactly, forecasts their battery naps, plans its own charge. Ahead of all three bots in 160 of 160 graded runs.">
+<meta property="og:image" content="img/dashboard.jpg">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%2300a6c1'/%3E%3Ctext x='32' y='44' font-size='36' text-anchor='middle' fill='%23070b16' font-family='monospace' font-weight='700'%3E~%3C/text%3E%3C/svg%3E">
+<!--
+  Project site for team NullPointerException, VelesHack 2026 Challenge 4.
+  Built into site/dist by `make site` and deployed by .github/workflows/pages.yml.
+  Copyright 2026 Sanchay Singh. SPDX-License-Identifier: Apache-2.0
+-->
+<style>
+:root {
+  --bg: #070b16; --bg2: #0c1324; --panel: rgba(18, 27, 48, 0.72); --line: rgba(120, 150, 210, 0.16);
+  --text: #e6ecff; --muted: #8a97b8; --dim: #56627f;
+  --us: #00a6c1; --naive: #c88100; --even: #9f78e9; --prop: #f04e7e; --good: #3ee08f; --bad: #ff5c6c;
+  --compute: #4f8dff; --energy: #ffcc33; --security: #3ee08f;
+  --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  --sans: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0; color: var(--text); font-family: var(--sans); font-size: 17px; line-height: 1.55;
+  background:
+    radial-gradient(1200px 700px at 10% -10%, rgba(0, 166, 193, 0.16), transparent 60%),
+    radial-gradient(1000px 600px at 100% 0%, rgba(159, 120, 233, 0.12), transparent 60%),
+    linear-gradient(180deg, var(--bg2), var(--bg) 900px);
+  background-color: var(--bg);
+}
+body::before {
+  content: ""; position: fixed; inset: 0; pointer-events: none; z-index: -1;
+  background-image: linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--line) 1px, transparent 1px);
+  background-size: 56px 56px; mask-image: radial-gradient(ellipse at 50% 0%, black 0%, transparent 70%); opacity: 0.4;
+}
+a { color: var(--us); text-decoration: none; }
+a:hover { text-decoration: underline; }
+.wrap { max-width: 1160px; margin: 0 auto; padding: 0 28px; }
+code { font-family: var(--mono); font-size: 0.9em; background: rgba(255,255,255,0.06); padding: 1px 6px; border-radius: 5px; }
+
+/* nav */
+nav { position: sticky; top: 0; z-index: 10; backdrop-filter: blur(12px); background: rgba(7, 11, 22, 0.7); border-bottom: 1px solid var(--line); }
+nav .wrap { display: flex; align-items: center; gap: 22px; height: 60px; }
+.brand { display: flex; align-items: center; gap: 10px; font: 700 15px var(--mono); color: var(--text); }
+.logo { width: 28px; height: 28px; border-radius: 8px; position: relative; flex: none;
+  background: conic-gradient(from 200deg, var(--us), var(--even), var(--prop), var(--naive), var(--us)); }
+.logo::after { content: ""; position: absolute; inset: 5px; border-radius: 4px; background: var(--bg2); }
+nav .links { margin-left: auto; display: flex; gap: 20px; font-size: 14px; }
+nav .links a { color: var(--muted); white-space: nowrap; }
+nav .links a:hover { color: var(--text); text-decoration: none; }
+
+/* hero */
+.hero { padding: 92px 0 56px; }
+.kicker { font: 700 13px var(--mono); letter-spacing: 0.2em; text-transform: uppercase; color: var(--us); }
+h1 { font-size: clamp(48px, 9vw, 112px); line-height: 1; letter-spacing: -0.03em; margin: 18px 0 0; font-weight: 800; }
+h1 em, h2 em { font-style: normal; color: var(--us); }
+.lede { font-size: clamp(18px, 2.2vw, 23px); color: var(--muted); max-width: 760px; margin-top: 22px; }
+.cta { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 34px; }
+.btn { display: inline-flex; align-items: center; gap: 10px; padding: 13px 22px; border-radius: 12px; font-weight: 700; font-size: 16px;
+  border: 1px solid var(--line); color: var(--text); background: rgba(255,255,255,0.04); }
+.btn:hover { text-decoration: none; border-color: var(--us); }
+.btn.primary { background: var(--us); color: #04121a; border-color: var(--us); box-shadow: 0 0 30px rgba(0,166,193,0.35); }
+.stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-top: 54px; }
+.stat { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 18px 20px; }
+.stat .v { font: 800 clamp(26px, 3.4vw, 38px) var(--mono); color: var(--us); white-space: nowrap; }
+.stat .v.good { color: var(--good); }
+.stat .l { color: var(--muted); font-size: 14px; margin-top: 4px; }
+.shot { margin-top: 44px; border-radius: 18px; border: 1px solid var(--line); overflow: hidden; display: block; position: relative;
+  box-shadow: 0 30px 80px rgba(0,0,0,0.5); }
+.shot img { width: 100%; display: block; }
+.shot .play { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(7,11,22,0.25); transition: background 0.2s; }
+.shot:hover .play { background: rgba(7,11,22,0.05); }
+.shot .play span { background: var(--us); color: #04121a; font-weight: 800; padding: 14px 24px; border-radius: 999px; box-shadow: 0 0 40px rgba(0,166,193,0.5); }
+
+/* sections */
+section { padding: 72px 0 8px; }
+h2 { font-size: clamp(30px, 4.2vw, 46px); line-height: 1.1; letter-spacing: -0.02em; margin: 12px 0 0; }
+.sub { color: var(--muted); max-width: 780px; margin-top: 14px; }
+.grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 32px; }
+.grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 32px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 22px 24px; }
+.card h3 { margin: 0; font-size: 19px; }
+.card p { margin: 8px 0 0; color: var(--muted); font-size: 15.5px; }
+.card .n { font: 700 12px var(--mono); color: var(--us); letter-spacing: 0.12em; text-transform: uppercase; }
+.card.trap { border-color: rgba(255, 92, 108, 0.35); background: linear-gradient(135deg, rgba(255,92,108,0.09), var(--panel)); }
+.formula { font: 600 20px var(--mono); margin-top: 10px; }
+.fig { margin-top: 28px; border-radius: 16px; border: 1px solid var(--line); overflow: hidden; background: #0c1324; }
+.fig img { width: 100%; display: block; }
+.caption { color: var(--dim); font-size: 13.5px; margin-top: 8px; }
+.bars { display: flex; height: 12px; gap: 3px; margin-top: 14px; }
+.bars i { display: block; height: 100%; border-radius: 3px; }
+
+table { width: 100%; border-collapse: collapse; margin-top: 26px; font-size: 15px; }
+th { text-align: left; color: var(--dim); font-weight: 600; font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+td { padding: 10px; border-bottom: 1px solid var(--line); }
+td.num { font-family: var(--mono); text-align: right; white-space: nowrap; }
+th.num { text-align: right; }
+tr.us td { background: rgba(0,166,193,0.08); font-weight: 700; }
+.tablewrap { overflow-x: auto; }
+
+.video { position: relative; padding-top: 56.25%; margin-top: 30px; border-radius: 16px; overflow: hidden; border: 1px solid var(--line); }
+.video iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+
+.checks { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 30px; }
+.checks .v { font: 800 36px var(--mono); color: var(--good); }
+ul.eng { margin: 26px 0 0; padding: 0; list-style: none; display: grid; gap: 12px; }
+ul.eng li { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 16px 20px; color: var(--muted); }
+ul.eng b { color: var(--text); }
+
+footer { margin-top: 90px; border-top: 1px solid var(--line); padding: 30px 0 50px; color: var(--dim); font-size: 14px; }
+footer .wrap { display: flex; gap: 20px; flex-wrap: wrap; justify-content: space-between; }
+
+@media (max-width: 900px) {
+  .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .grid3, .checks { grid-template-columns: minmax(0, 1fr); }
+  .grid2 { grid-template-columns: minmax(0, 1fr); }
+  nav .links a.opt { display: none; }
+}
+@media (max-width: 560px) {
+  .wrap { padding: 0 16px; }
+  .hero { padding-top: 56px; }
+  nav .links { gap: 14px; }
+  nav .links a.opt2 { display: none; }
+  .brand { font-size: 13px; }
+  .stat { padding: 14px; }
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <a class="brand" href="#top"><span class="logo"></span>NullPointerException</a>
+    <div class="links">
+      <a class="opt" href="#how">How it works</a>
+      <a class="opt2" href="#results">Results</a>
+      <a href="run/?replay=../data/live-run.json">Live run</a>
+      <a href="https://github.com/Sanchay117/veleshack-2026-4th-challenge">GitHub</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="wrap">
+    <div class="kicker">VelesHack 2026 · Challenge 4 · CoGNETs Smart Edge Resource Auctions</div>
+    <h1>Forecast. Plan. <em>Bid.</em></h1>
+    <p class="lede">An edge-node agent for the CoGNETs Swarm Arena that computes the market instead of guessing it: it reproduces its rivals' bids exactly, forecasts when their batteries will run flat, and plans its own charge for the whole run.</p>
+    <div class="cta">
+      <a class="btn primary" href="run/?replay=../data/live-run.json">▶ Watch a live run</a>
+      <a class="btn" href="https://github.com/Sanchay117/veleshack-2026-4th-challenge">Code on GitHub</a>
+      <a class="btn" href="#video" id="video-link">Demo video</a>
+    </div>
+    <div class="stats">
+      <div class="stat"><div class="v">+34.9%</div><div class="l">mean score over the template</div></div>
+      <div class="stat"><div class="v good">160 / 160</div><div class="l">graded runs ahead of all three bots</div></div>
+      <div class="stat"><div class="v">+13.6%</div><div class="l">over the template in the worst run</div></div>
+      <div class="stat"><div class="v good">48 / 48</div><div class="l">live decisions with the rivals' bids predicted exactly</div></div>
+    </div>
+    <a class="shot" href="run/?replay=../data/live-run.json" aria-label="Open the live run replay">
+      <img src="img/dashboard.jpg" alt="Mission-control dashboard during a live run: battery traces, our plan, forecast naps, pool shares and the score race" width="1920" height="1080">
+      <span class="play"><span>▶ Replay this run in your browser</span></span>
+    </a>
+    <p class="caption">The mission-control dashboard during a live graded run with injected faults. The replay plays the recorded run round by round.</p>
+  </div>
+</header>
+
+<section id="problem">
+  <div class="wrap">
+    <div class="kicker">The arena</div>
+    <h2>Four nodes. Three pools. <em>One battery each.</em></h2>
+    <p class="sub">Every round each edge node splits a budget across compute, energy and security. Pools are shared in proportion to the bids (a Kelly mechanism) and the payoff is a CES utility that rewards balanced bundles. Score is the sum over 60 rounds.</p>
+    <div class="grid3">
+      <div class="card"><div class="n">allocation</div><div class="formula">x = C · b / Σb</div><p>Your share follows your bid, with diminishing returns.</p>
+        <div class="bars"><i style="flex:4;background:var(--us)"></i><i style="flex:3;background:var(--naive)"></i><i style="flex:3;background:var(--even)"></i><i style="flex:2;background:var(--prop)"></i></div></div>
+      <div class="card trap"><h3>Miss a service floor</h3><p>Too little compute or security and the round is halved. Miss both and it is quartered.</p></div>
+      <div class="card trap"><h3>The energy you win drains you</h3><p>Run your battery flat and you sit rounds out, scoring nothing. The three baseline bots never notice and sleep about a third of the run.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="how">
+  <div class="wrap">
+    <div class="kicker">Insight 1</div>
+    <h2>Don't estimate the market. <em>Compute it.</em></h2>
+    <p class="sub">Three facts are public: the bots are open source, they run on a copy of our device, and <code>/v1/swarm</code> publishes every node's battery each round. So each round the agent replays the bots' own logic on the public round data and reproduces their bids to six decimals. The clearing price checks the forecast after every round, and a residual absorbs anything unexplained. With the field known exactly, both service floors are bought at the exact minimum: 2 misses in 9,600 rounds.</p>
+    <div class="grid3">
+      <div class="card"><div class="n">01 · public</div><h3>The bots are open source</h3><p><code>baselines/bot.py</code>, replayed bug for bug.</p></div>
+      <div class="card"><div class="n">02 · public</div><h3>They run on our device</h3><p>Same weights, floors and starting battery, so their profile is ours.</p></div>
+      <div class="card"><div class="n">03 · public</div><h3>Every battery, every round</h3><p>So we know who is awake before we bid.</p></div>
+    </div>
+
+    <div class="kicker" style="margin-top:72px">Insight 2</div>
+    <h2>Their naps are predictable. <em>Plan around them.</em></h2>
+    <p class="sub">The bots never manage their batteries, so rolling their shadows forward tells us who will be asleep one round ahead 99% of the time. That forecast feeds a dynamic programme over our battery for the rest of the run, solved again every round in about 50 ms: <code>V<sub>t</sub>(B) = max<sub>a</sub> [ u<sub>t</sub>(a) + V<sub>t+1</sub>(B − d<sub>a</sub>) ]</code>. It sips energy when the pools are crowded, spends it when rivals sleep, rests on purpose when they wake, and empties the battery on the final round.</p>
+    <div class="grid2">
+      <div class="fig"><img src="img/battery.svg" alt="Battery traces in one run: the bots crash early, ours follows a planned rhythm"></div>
+      <div class="fig"><img src="img/forecast.svg" alt="Nap forecast accuracy by rounds ahead: 99% one round ahead, 72% five rounds ahead"></div>
+    </div>
+  </div>
+</section>
+
+<section id="results">
+  <div class="wrap">
+    <div class="kicker">Results</div>
+    <h2>Ahead of every bot, <em>every run.</em></h2>
+    <p class="sub">160 graded runs per strategy, on seeds never used in development (1000 to 1039) and four devices including our own. The same seeds and devices for every row; every number regenerates with <code>python lab/experiments.py</code>.</p>
+    <div class="fig"><img src="img/ladder.svg" alt="Score over the template by strategy: ours +34.9%"></div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Strategy in our seat</th><th class="num">vs template</th><th class="num">worst run</th><th class="num">beats all 3 bots</th><th class="num">rested</th></tr></thead>
+        <tbody>
+          <tr><td>template (naive-max)</td><td class="num">0.0%</td><td class="num">0.0%</td><td class="num">0%</td><td class="num">18.7</td></tr>
+          <tr><td>exact best response, battery-blind</td><td class="num">+7.8%</td><td class="num">−3.0%</td><td class="num">8%</td><td class="num">18.9</td></tr>
+          <tr><td>battery taper + floors (strong heuristic)</td><td class="num">+20.0%</td><td class="num">−14.5%</td><td class="num">88%</td><td class="num">1.4</td></tr>
+          <tr><td>ours without the opponent model</td><td class="num">+31.0%</td><td class="num">+8.5%</td><td class="num">99%</td><td class="num">7.2</td></tr>
+          <tr><td>ours without the battery plan</td><td class="num">+30.2%</td><td class="num">+7.8%</td><td class="num">97%</td><td class="num">7.4</td></tr>
+          <tr class="us"><td>ours: forecast + plan</td><td class="num">+34.9%</td><td class="num">+13.6%</td><td class="num">100%</td><td class="num">7.4</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="fig"><img src="img/anatomy.svg" alt="Where the 60 rounds go: ours rests 7.5 rounds and plays 40 thin-market rounds; the template rests 18.7"></div>
+
+    <div class="grid2">
+      <div class="card">
+        <div class="n">robustness</div>
+        <h3>Conditions it never saw</h3>
+        <p>Battery 50% hungrier: <b>+46.4%</b>. 33% thriftier: <b>+23.9%</b>. An unknown extra agent in the swarm: <b>+38.8%</b>. Joining at round 12: <b>+35.8%</b>. The practice scenario: <b>+35.5%</b>. The drain rate is re-fitted online from the agent's own results.</p>
+      </div>
+      <div class="card">
+        <div class="n">the honest welfare answer</div>
+        <h3>We mostly take from the bots</h3>
+        <p>With us in the seat instead of the template the bots lose <b>12.2%</b> of their score and the whole swarm only <b>1.4%</b>; log social welfare goes from −3.08 to −3.20. Leaving the energy pool to the bots makes them drain faster: they rest 11% more.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="video" hidden>
+  <div class="wrap">
+    <div class="kicker">Demo</div>
+    <h2>The three-minute version</h2>
+    <div class="video"><iframe id="yt" title="Demo video" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe></div>
+  </div>
+</section>
+
+<section id="engineering">
+  <div class="wrap">
+    <div class="kicker">Engineering</div>
+    <h2>Built not to lose a round.</h2>
+    <div class="checks">
+      <div class="card"><div class="v">8 / 8</div><p>organisers' conformance checks, against the Docker image</p></div>
+      <div class="card"><div class="v">30 / 30</div><p>functional: 0 missed rounds under injected faults</p></div>
+      <div class="card"><div class="v">20 / 20</div><p>resilience: 503s, 429s, latency, lease expiry</p></div>
+    </div>
+    <ul class="eng">
+      <li><b>Deadline-aware retries.</b> Injected 503s are independent dice rolls, so the bid path backs off with full jitter from 60 ms and keeps trying until the round actually closes, never sleeping past it.</li>
+      <li><b>A bug in the template, found live.</b> Its loop asks only for the result of the round it has just bid in, which has not settled yet, so it read 1 result in 49 rounds. Ours reads them all, and the opponent model learns which stale result the bots, running the same loop, are really using.</li>
+      <li><b>Never over budget.</b> Six-decimal rounding could tip a bid 1.5e-6 over the arena's tolerance, a compromise penalty. The unit tests caught it; bids now round down.</li>
+      <li><b>Fallbacks at every layer.</b> No swarm snapshot: estimate from prices. Forecast drifting: widen the floor margins with the measured error. Planner error: a safe battery-aware bid. A strategy bug costs score, never the run.</li>
+    </ul>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <span>Team <b style="color:var(--text)">NullPointerException</b> · Sanchay Singh · VelesHack 2026</span>
+    <span><a href="https://github.com/Sanchay117/veleshack-2026-4th-challenge">Repository</a> · Apache-2.0 · arena, bots and template by the CoGNETs Consortium</span>
+  </div>
+</footer>
+
+<script>
+/* Set the demo video's YouTube id here once it is uploaded; the section stays hidden until then. */
+const YOUTUBE_ID = "";
+if (YOUTUBE_ID) {
+  document.getElementById("yt").src = "https://www.youtube-nocookie.com/embed/" + YOUTUBE_ID;
+  document.getElementById("video").hidden = false;
+} else {
+  document.getElementById("video-link").href = "https://github.com/Sanchay117/veleshack-2026-4th-challenge#readme";
+  document.getElementById("video-link").textContent = "Read the write-up";
+}
+</script>
+</body>
+</html>

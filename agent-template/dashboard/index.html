@@ -155,9 +155,31 @@ tr.us td.team { color: var(--us); }
 .waiting { position: fixed; inset: 0; display: grid; place-items: center; background: rgba(7,11,22,0.85); z-index: 10; font: 600 15px var(--mono); color: var(--muted); }
 .waiting.hidden { display: none; }
 
+/* ---------- replay controls (only with ?replay=) ---------- */
+.replay {
+  position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 20;
+  display: flex; align-items: center; gap: 10px; padding: 10px 14px; max-width: calc(100vw - 32px);
+  background: rgba(7, 11, 22, 0.92); border: 1px solid rgba(0, 166, 193, 0.4); border-radius: 14px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5); backdrop-filter: blur(10px);
+}
+.replay button {
+  font: 700 13px var(--mono); color: var(--text); background: rgba(255,255,255,0.06);
+  border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; cursor: pointer; min-width: 36px;
+}
+.replay button:hover { border-color: var(--us); }
+.replay button.on { background: var(--us); color: #04121a; border-color: var(--us); }
+.rp-speeds { display: inline-flex; gap: 4px; }
+.replay input[type=range] { width: 220px; accent-color: var(--us); }
+.rp-label { font: 600 12px var(--mono); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 460px; }
+body:has(.replay) .wrap { padding-bottom: 90px; }
+
 @media (max-width: 1100px) {
   .kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .grid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 760px) {
+  .rp-label { display: none; }
+  .replay input[type=range] { width: 120px; }
 }
 @media (max-width: 560px) {
   .wrap { padding: 12px 16px 20px; }
@@ -558,7 +580,72 @@ async function tick() {
   $("live").classList.toggle("off", Date.now() - lastOk > 3000);
   setTimeout(tick, 400);
 }
-tick();
+
+/* ------------------------------------------------------------ replay ---- */
+/* ?replay=<file>: play a run recorded by `demo/film.py capture` in the
+   browser, no agent needed. The per-round history is stored once and cut to
+   each frame's round here. */
+const Replay = {
+  data: null, i: 0, playing: true, speed: 2, timer: null,
+  state(i) {
+    const d = this.data, f = d.frames[i];
+    const upto = f.decision.round || 0;
+    const decisions = {};
+    for (const k in d.decisions || {}) if (+k <= upto) decisions[k] = d.decisions[k];
+    return { team: d.team, decision: f.decision, leaderboard: f.leaderboard, status: f.status,
+             rounds: (d.rounds || []).filter((r) => r.round < upto), decisions };
+  },
+  show(i) {
+    this.i = Math.max(0, Math.min(i, this.data.frames.length - 1));
+    render(this.state(this.i));
+    $("rp-scrub").value = this.i;
+    $("rp-play").textContent = this.playing ? "❚❚" : "▶";
+  },
+  step() {
+    clearTimeout(this.timer);
+    if (this.playing) {
+      const last = this.data.frames.length - 1;
+      if (this.i < last) this.show(this.i + 1);
+      else { this.playing = false; this.show(this.i); return; }
+    }
+    this.timer = setTimeout(() => this.step(), 1000 / this.speed);
+  },
+  async start(url) {
+    const bar = document.createElement("div");
+    bar.className = "replay";
+    bar.innerHTML = `
+      <button id="rp-restart" title="Restart" aria-label="Restart">⟲</button>
+      <button id="rp-play" title="Play or pause" aria-label="Play or pause">❚❚</button>
+      <span class="rp-speeds">${[1, 2, 4].map((s) => `<button data-speed="${s}">${s}×</button>`).join("")}</span>
+      <input id="rp-scrub" type="range" min="0" value="0" aria-label="Round">
+      <span id="rp-label" class="rp-label"></span>`;
+    document.body.appendChild(bar);
+    $("live").classList.add("off");
+    this.data = await (await fetch(url)).json();
+    $("rp-scrub").max = this.data.frames.length - 1;
+    $("rp-label").textContent = (this.data.meta && this.data.meta.label) || "Recorded run";
+    $("updated").textContent = "replay";
+    $("waiting").classList.add("hidden");
+    $("rp-play").onclick = () => {
+      if (!this.playing && this.i >= this.data.frames.length - 1) this.i = 0;
+      this.playing = !this.playing; this.show(this.i); this.step();
+    };
+    $("rp-restart").onclick = () => { this.playing = true; this.show(0); this.step(); };
+    $("rp-scrub").oninput = (e) => { this.playing = false; this.show(+e.target.value); };
+    bar.querySelectorAll("[data-speed]").forEach((b) => {
+      b.onclick = () => {
+        this.speed = +b.dataset.speed;
+        bar.querySelectorAll("[data-speed]").forEach((x) => x.classList.toggle("on", x === b));
+      };
+      b.classList.toggle("on", +b.dataset.speed === this.speed);
+    });
+    this.show(0);
+    this.step();
+  },
+};
+
+const replayUrl = new URLSearchParams(location.search).get("replay");
+if (replayUrl) Replay.start(replayUrl); else tick();
 </script>
 </body>
 </html>
