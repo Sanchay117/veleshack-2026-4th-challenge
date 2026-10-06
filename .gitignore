@@ -22,6 +22,7 @@ results*.json
 conformance-*.json
 
 # Editors / OS
+.claude/
 .vscode/
 .idea/
 .DS_Store

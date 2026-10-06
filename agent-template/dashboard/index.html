@@ -1,0 +1,562 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Swarm Mission Control</title>
+<!--
+  Live view of one agent's run in the CoGNETs Swarm Arena.
+  Served by the agent itself (TELEMETRY_PORT) or by lab/replay.py.
+  Self-contained: no external scripts, fonts or styles, so it works offline.
+
+  Copyright 2026 Sanchay Singh
+  SPDX-License-Identifier: Apache-2.0
+-->
+<style>
+:root {
+  --bg: #070b16;
+  --bg2: #0c1324;
+  --panel: rgba(18, 27, 48, 0.72);
+  --line: rgba(120, 150, 210, 0.16);
+  --text: #e6ecff;
+  --muted: #8a97b8;
+  --dim: #56627f;
+  --us: #22e1ff;
+  --us-glow: rgba(34, 225, 255, 0.45);
+  --naive: #ffb020;
+  --even: #b28cff;
+  --prop: #ff5c8a;
+  --other: #9aa6c2;
+  --good: #3ee08f;
+  --bad: #ff5c6c;
+  --compute: #4f8dff;
+  --energy: #ffcc33;
+  --security: #3ee08f;
+  --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  --sans: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  background:
+    radial-gradient(1200px 600px at 15% -10%, rgba(34, 225, 255, 0.10), transparent 60%),
+    radial-gradient(900px 500px at 100% 0%, rgba(178, 140, 255, 0.10), transparent 60%),
+    linear-gradient(180deg, var(--bg2), var(--bg));
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 14px;
+  overflow-x: hidden;
+}
+body::before {
+  content: ""; position: fixed; inset: 0; pointer-events: none;
+  background-image:
+    linear-gradient(var(--line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--line) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(ellipse at 50% 0%, black 0%, transparent 75%);
+  opacity: 0.35;
+}
+.wrap { position: relative; max-width: 1600px; margin: 0 auto; padding: 18px 22px 28px; }
+
+/* ---------- top bar ---------- */
+.top { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+.brand { display: flex; align-items: center; gap: 12px; }
+.logo {
+  width: 38px; height: 38px; border-radius: 10px; position: relative;
+  background: conic-gradient(from 200deg, var(--us), var(--even), var(--prop), var(--naive), var(--us));
+  box-shadow: 0 0 24px var(--us-glow);
+}
+.logo::after { content: ""; position: absolute; inset: 6px; border-radius: 6px; background: var(--bg2); }
+.logo span { position: absolute; inset: 0; display: grid; place-items: center; z-index: 1;
+  font: 700 15px var(--mono); color: var(--us); }
+.title { font-weight: 800; letter-spacing: 0.16em; font-size: 15px; }
+.subtitle { color: var(--muted); font-size: 12px; letter-spacing: 0.06em; }
+.chips { display: flex; gap: 8px; flex-wrap: wrap; margin-left: auto; }
+.chip {
+  border: 1px solid var(--line); background: rgba(10, 16, 30, 0.6);
+  padding: 6px 11px; border-radius: 999px; font: 600 12px var(--mono); color: var(--muted);
+  display: flex; align-items: center; gap: 7px; white-space: nowrap;
+}
+.chip b { color: var(--text); font-weight: 700; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--good); box-shadow: 0 0 10px var(--good); }
+.dot.off { background: var(--bad); box-shadow: 0 0 10px var(--bad); }
+.round-big { font: 800 30px var(--mono); letter-spacing: 0.02em; }
+.round-big small { color: var(--muted); font-size: 16px; font-weight: 600; }
+.progress { height: 4px; background: rgba(255,255,255,0.06); border-radius: 4px; overflow: hidden; margin-top: 14px; }
+.progress > div { height: 100%; width: 0; background: linear-gradient(90deg, var(--us), var(--even)); transition: width 0.4s ease; }
+
+/* ---------- KPI row ---------- */
+.kpis { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; margin-top: 16px; }
+.kpi {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+  padding: 12px 14px; backdrop-filter: blur(8px); min-width: 0;
+}
+.kpi .label { color: var(--muted); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; }
+.kpi .value { font: 800 26px var(--mono); margin-top: 4px; white-space: nowrap; }
+.kpi .value.us { color: var(--us); text-shadow: 0 0 18px var(--us-glow); }
+.kpi .value.good { color: var(--good); }
+.kpi .value.bad { color: var(--bad); }
+.kpi .hint { color: var(--dim); font-size: 11px; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ---------- panels ---------- */
+.grid { display: grid; grid-template-columns: minmax(0, 1.75fr) minmax(0, 1fr); gap: 14px; margin-top: 14px; }
+.panel {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 16px;
+  padding: 14px 16px 12px; backdrop-filter: blur(8px); min-width: 0;
+}
+.panel h2 {
+  margin: 0 0 10px; font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase;
+  color: var(--muted); display: flex; align-items: center; gap: 10px;
+}
+.panel h2 .tag { margin-left: auto; font: 600 11px var(--mono); color: var(--dim); letter-spacing: 0.04em; text-transform: none; }
+svg { display: block; width: 100%; overflow: visible; }
+.axis text { fill: var(--dim); font: 10px var(--mono); }
+.axis line { stroke: var(--line); }
+.legend { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 6px; font-size: 12px; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 14px; height: 3px; border-radius: 2px; display: inline-block; }
+.legend i.dash { background: repeating-linear-gradient(90deg, var(--us) 0 4px, transparent 4px 7px) !important; }
+
+/* ---------- pools ---------- */
+.pool { margin: 10px 0 14px; }
+.pool-head { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+.pool-head b { color: var(--text); font-family: var(--mono); }
+.bar { display: flex; height: 26px; border-radius: 8px; overflow: hidden; background: rgba(255,255,255,0.04); border: 1px solid var(--line); }
+.seg { height: 100%; transition: flex-basis 0.45s ease; display: grid; place-items: center;
+  font: 700 11px var(--mono); color: rgba(0,0,0,0.75); overflow: hidden; white-space: nowrap; }
+.seg.us { box-shadow: inset 0 0 0 2px rgba(255,255,255,0.65); }
+.napping { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
+.nap { font: 600 12px var(--mono); padding: 5px 10px; border-radius: 8px; border: 1px dashed var(--line); color: var(--muted); }
+.nap.zz { animation: breathe 2.2s ease-in-out infinite; }
+@keyframes breathe { 50% { opacity: 0.45; } }
+
+.decide { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 10px; margin-top: 4px; }
+.mini { border: 1px solid var(--line); border-radius: 12px; padding: 9px 11px; background: rgba(5, 10, 22, 0.45); min-width: 0; }
+.mini .label { color: var(--muted); font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; }
+.mini .value { font: 800 18px var(--mono); margin-top: 3px; }
+.why { margin-top: 12px; padding: 10px 12px; border-radius: 12px; border: 1px solid rgba(34,225,255,0.25);
+  background: linear-gradient(90deg, rgba(34,225,255,0.08), transparent); font-size: 13px; line-height: 1.45; color: #cfe9ff; min-height: 58px; }
+.why b { color: var(--us); }
+
+/* ---------- table ---------- */
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { color: var(--dim); font-weight: 600; text-align: left; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; padding: 4px 6px 8px; }
+td { padding: 7px 6px; border-top: 1px solid var(--line); font-family: var(--mono); white-space: nowrap; }
+td.team { font-family: var(--sans); font-weight: 600; }
+tr.us td { background: rgba(34,225,255,0.07); }
+tr.us td.team { color: var(--us); }
+.scorebar { height: 6px; border-radius: 3px; background: rgba(255,255,255,0.06); margin-top: 5px; overflow: hidden; }
+.scorebar > div { height: 100%; transition: width 0.45s ease; }
+.batt { display: inline-block; width: 46px; height: 12px; border: 1px solid var(--muted); border-radius: 3px; position: relative; vertical-align: middle; margin-right: 6px; }
+.batt::after { content: ""; position: absolute; right: -4px; top: 3px; width: 2px; height: 5px; background: var(--muted); border-radius: 1px; }
+.batt > div { position: absolute; left: 1px; top: 1px; bottom: 1px; border-radius: 1px; transition: width 0.45s ease; }
+
+.footer { color: var(--dim); font-size: 11px; margin-top: 14px; display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.waiting { position: fixed; inset: 0; display: grid; place-items: center; background: rgba(7,11,22,0.85); z-index: 10; font: 600 15px var(--mono); color: var(--muted); }
+.waiting.hidden { display: none; }
+
+@media (max-width: 1100px) {
+  .kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .grid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 560px) {
+  .wrap { padding: 12px 16px 20px; }
+  .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .decide { grid-template-columns: repeat(2, minmax(0,1fr)); }
+  .round-big { font-size: 24px; }
+}
+</style>
+</head>
+<body>
+<div class="waiting" id="waiting">waiting for the agent's first round...</div>
+<div class="wrap">
+  <div class="top">
+    <div class="brand">
+      <div class="logo"><span>∿</span></div>
+      <div>
+        <div class="title">SWARM MISSION CONTROL</div>
+        <div class="subtitle">CoGNETs edge auction · forecast, plan, bid</div>
+      </div>
+    </div>
+    <div class="round-big" id="round">R 0 <small>/ 0</small></div>
+    <div class="chips">
+      <div class="chip"><span class="dot" id="live"></span><b id="team">-</b></div>
+      <div class="chip">scenario <b id="scenario">-</b></div>
+      <div class="chip">opponent model <b id="model">-</b></div>
+      <div class="chip">think <b id="think">-</b></div>
+    </div>
+  </div>
+  <div class="progress"><div id="prog"></div></div>
+
+  <div class="kpis">
+    <div class="kpi"><div class="label">Our score</div><div class="value us" id="k-score">0.00</div><div class="hint" id="k-rank">rank -</div></div>
+    <div class="kpi"><div class="label">Lead over best bot</div><div class="value good" id="k-lead">-</div><div class="hint" id="k-best">-</div></div>
+    <div class="kpi"><div class="label">Rounds resting</div><div class="value" id="k-idle">0</div><div class="hint" id="k-idle-bots">bots: -</div></div>
+    <div class="kpi"><div class="label">Floor misses</div><div class="value" id="k-floors">0</div><div class="hint">each one halves a round</div></div>
+    <div class="kpi"><div class="label">Value of charge</div><div class="value" id="k-shadow">-</div><div class="hint">utility per unit of battery (DP)</div></div>
+    <div class="kpi"><div class="label">Swarm welfare (LSW)</div><div class="value" id="k-lsw">-</div><div class="hint">Σ log u, last round</div></div>
+  </div>
+
+  <div class="grid">
+    <div class="panel">
+      <h2>Battery: everyone's charge, and our plan <span class="tag" id="plan-tag"></span></h2>
+      <svg id="battery" height="250"></svg>
+      <div class="legend" id="legend"></div>
+      <h2 style="margin-top:16px">Who is awake, past and forecast <span class="tag">solid = played · z = resting · outline = forecast</span></h2>
+      <svg id="naps" height="130"></svg>
+    </div>
+
+    <div class="panel">
+      <h2>This round's market <span class="tag" id="field-tag"></span></h2>
+      <div id="pools"></div>
+      <div class="napping" id="napping"></div>
+      <div class="decide">
+        <div class="mini"><div class="label">Energy spend</div><div class="value" id="d-energy">-</div></div>
+        <div class="mini"><div class="label">Expected utility</div><div class="value" id="d-util">-</div></div>
+        <div class="mini"><div class="label">Battery cost</div><div class="value" id="d-drain">-</div></div>
+      </div>
+      <div class="why" id="why">-</div>
+    </div>
+
+    <div class="panel">
+      <h2>Score race <span class="tag">cumulative utility</span></h2>
+      <svg id="race" height="220"></svg>
+    </div>
+
+    <div class="panel">
+      <h2>Leaderboard</h2>
+      <table>
+        <thead><tr><th>#</th><th>node</th><th>score</th><th>rested</th><th>floors</th><th>battery</th></tr></thead>
+        <tbody id="board"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="footer">
+    <span>Opponent bids are reproduced from public data each round and checked against the clearing price.</span>
+    <span id="updated">-</span>
+  </div>
+</div>
+
+<script>
+"use strict";
+const COLORS = { "bot-naive-max": "var(--naive)", "bot-even-split": "var(--even)", "bot-proportional": "var(--prop)" };
+const RAW = { "bot-naive-max": "#ffb020", "bot-even-split": "#b28cff", "bot-proportional": "#ff5c8a", us: "#22e1ff" };
+const POOLS = [["compute", "var(--compute)"], ["energy", "var(--energy)"], ["security", "var(--security)"]];
+const $ = (id) => document.getElementById(id);
+const NS = "http://www.w3.org/2000/svg";
+let lastOk = 0;
+
+function colorOf(team, us) { return team === us ? "var(--us)" : (COLORS[team] || "var(--other)"); }
+function rawOf(team, us) { return team === us ? RAW.us : (RAW[team] || "#9aa6c2"); }
+function short(team, us) { return team === us ? "us · " + team : team.replace(/^bot-/, ""); }
+function fmt(x, d = 2) { return (x === null || x === undefined || isNaN(x)) ? "-" : Number(x).toFixed(d); }
+function el(tag, attrs, parent) {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+
+/* ------------------------------------------------------------ order ---- */
+function teamsOf(s) {
+  const us = s.team;
+  const all = new Set((s.leaderboard || []).map((r) => r.team));
+  for (const r of s.rounds || []) for (const t in r.nodes) all.add(t);
+  const rest = [...all].filter((t) => t !== us).sort();
+  return all.has(us) ? [us, ...rest] : rest;
+}
+
+/* ---------------------------------------------------------- battery ---- */
+/* Charts are drawn at their real pixel width, so text is never stretched. */
+function canvas(id, H) {
+  const svg = $(id); svg.innerHTML = "";
+  const W = Math.max(320, Math.round(svg.getBoundingClientRect().width || 900));
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  return [svg, W];
+}
+
+function drawBattery(s, teams) {
+  const H = 250, L = 34, R = 10, T = 8, B = 22;
+  const [svg, W] = canvas("battery", H);
+  const total = (s.status && s.status.total_rounds) || 60;
+  const x = (r) => L + (r / total) * (W - L - R);
+  const y = (b) => T + (1 - b) * (H - T - B);
+  const ax = el("g", { class: "axis" }, svg);
+  for (const b of [0, 0.25, 0.5, 0.75, 1]) {
+    el("line", { x1: L, x2: W - R, y1: y(b), y2: y(b) }, ax);
+    el("text", { x: 4, y: y(b) + 3 }, ax).textContent = b.toFixed(2);
+  }
+  for (let r = 0; r <= total; r += 10) el("text", { x: x(r) - 6, y: H - 6 }, ax).textContent = r;
+  const cut = el("line", { x1: L, x2: W - R, y1: y(0.05), y2: y(0.05), stroke: "#ff5c6c", "stroke-dasharray": "5 5", "stroke-width": 1.2, opacity: 0.8 }, svg);
+  el("text", { x: W - R - 70, y: y(0.05) - 5, fill: "#ff5c6c", "font-size": 10, "font-family": "monospace" }, svg).textContent = "flat: sits out";
+
+  const defs = el("defs", {}, svg);
+  const f = el("filter", { id: "glow", x: "-20%", y: "-20%", width: "140%", height: "140%" }, defs);
+  el("feGaussianBlur", { stdDeviation: 3, result: "b" }, f);
+  const m = el("feMerge", {}, f); el("feMergeNode", { in: "b" }, m); el("feMergeNode", { in: "SourceGraphic" }, m);
+
+  const rounds = s.rounds || [];
+  const now = s.decision && s.decision.round ? s.decision.round : (rounds.length ? rounds[rounds.length - 1].round + 1 : 1);
+  el("rect", { x: x(now - 1), y: T, width: Math.max(2, x(now) - x(now - 1)), height: H - T - B, fill: "rgba(34,225,255,0.07)" }, svg);
+
+  for (const team of [...teams].reverse()) {
+    const pts = rounds.filter((r) => r.nodes[team] && r.nodes[team].battery !== undefined && r.nodes[team].battery !== null)
+      .map((r) => [x(r.round), y(r.nodes[team].battery)]);
+    if (pts.length < 1) continue;
+    const isUs = team === s.team;
+    el("polyline", {
+      points: pts.map((p) => p.join(",")).join(" "), fill: "none",
+      stroke: rawOf(team, s.team), "stroke-width": isUs ? 3 : 1.8,
+      "stroke-linejoin": "round", opacity: isUs ? 1 : 0.85,
+      filter: isUs ? "url(#glow)" : "",
+    }, svg);
+  }
+  // The plan: the DP's projected battery from this round to the end.
+  const d = s.decision || {};
+  $("plan-tag").textContent = "";
+  if (d.plan_battery && d.plan_battery.length > 1) {
+    const pts = d.plan_battery.map((b, i) => [x(d.round - 1 + i), y(b)]);
+    el("polyline", { points: pts.map((p) => p.join(",")).join(" "), fill: "none", stroke: RAW.us,
+      "stroke-width": 2, "stroke-dasharray": "6 5", opacity: 0.75 }, svg);
+    $("plan-tag").textContent = `plan: ${d.plan_battery.length - 1} rounds ahead, re-solved every round`;
+  }
+  const lg = $("legend"); lg.innerHTML = "";
+  for (const t of teams) lg.insertAdjacentHTML("beforeend", `<span><i style="background:${colorOf(t, s.team)}"></i>${short(t, s.team)}</span>`);
+  lg.insertAdjacentHTML("beforeend", `<span><i class="dash"></i>our plan</span>`);
+}
+
+/* ------------------------------------------------------------- naps ---- */
+function drawNaps(s, teams) {
+  const [svg, W] = canvas("naps", 130);
+  const L = 96, R = 10, total = (s.status && s.status.total_rounds) || 60;
+  const rowH = Math.min(26, 124 / Math.max(1, teams.length));
+  const cw = (W - L - R) / total;
+  const rounds = s.rounds || [];
+  const byRound = {}; for (const r of rounds) byRound[r.round] = r;
+  const d = s.decision || {};
+  teams.forEach((team, i) => {
+    const y0 = 2 + i * rowH;
+    el("text", { x: 0, y: y0 + rowH / 2 + 4, fill: rawOf(team, s.team), "font-size": 11, "font-family": "monospace", "font-weight": team === s.team ? 700 : 500 }, svg)
+      .textContent = team === s.team ? "us" : team.replace(/^bot-/, "");
+    for (let r = 1; r <= total; r++) {
+      const cx = L + (r - 1) * cw;
+      const cur = byRound[r], prev = byRound[r - 1];
+      let state = null, forecast = false;
+      if (cur && cur.nodes[team]) {
+        const n = cur.nodes[team], p = prev && prev.nodes[team];
+        const idleBefore = p ? p.idle : 0, playedBefore = p ? p.played : 0;
+        if (n.played > playedBefore) state = "on"; else if (n.idle > idleBefore) state = "z";
+      } else if (d.round && r >= d.round) {
+        forecast = true;
+        const k = r - d.round;
+        if (team === s.team) {
+          const a = d.plan_actions ? d.plan_actions[k] : undefined;
+          state = a === undefined ? null : (a < 0 ? "z" : "on");
+        } else if (k === 0) {
+          state = (d.awake || []).includes(team) ? "on" : "z";
+        } else {
+          const f = d.forecast_awake ? d.forecast_awake[k - 1] : undefined;
+          state = f === undefined ? null : (f.includes(team) ? "on" : "z");
+        }
+      }
+      if (!state) continue;
+      const col = rawOf(team, s.team);
+      if (state === "on") {
+        el("rect", { x: cx + 0.8, y: y0 + 2, width: Math.max(1, cw - 1.6), height: rowH - 4, rx: 2,
+          fill: forecast ? "none" : col, stroke: forecast ? col : "none", "stroke-width": forecast ? 1 : 0,
+          opacity: forecast ? 0.7 : 0.9 }, svg);
+      } else {
+        el("rect", { x: cx + 0.8, y: y0 + 2, width: Math.max(1, cw - 1.6), height: rowH - 4, rx: 2,
+          fill: "rgba(255,255,255,0.03)", stroke: "rgba(255,255,255,0.08)" }, svg);
+        if (cw > 8) el("text", { x: cx + cw / 2 - 3, y: y0 + rowH / 2 + 4, fill: forecast ? "#56627f" : "#8a97b8", "font-size": 10, "font-family": "monospace" }, svg).textContent = "z";
+      }
+    }
+  });
+  if (d.round) {
+    const xNow = L + (d.round - 1) * cw;
+    el("line", { x1: xNow, x2: xNow, y1: 0, y2: teams.length * rowH + 4, stroke: RAW.us, "stroke-width": 1.5, opacity: 0.9 }, svg);
+  }
+}
+
+/* ------------------------------------------------------------- race ---- */
+function drawRace(s, teams) {
+  const H = 220, L = 34, R = 56, T = 8, B = 22;
+  const [svg, W] = canvas("race", H);
+  const total = (s.status && s.status.total_rounds) || 60;
+  const rounds = s.rounds || [];
+  let maxS = 1;
+  for (const r of rounds) for (const t in r.nodes) maxS = Math.max(maxS, r.nodes[t].score || 0);
+  maxS *= 1.08;
+  const x = (r) => L + (r / total) * (W - L - R);
+  const y = (v) => T + (1 - v / maxS) * (H - T - B);
+  const ax = el("g", { class: "axis" }, svg);
+  for (let i = 0; i <= 4; i++) {
+    const v = (maxS * i) / 4;
+    el("line", { x1: L, x2: W - R, y1: y(v), y2: y(v) }, ax);
+    el("text", { x: 2, y: y(v) + 3 }, ax).textContent = v.toFixed(0);
+  }
+  for (let r = 0; r <= total; r += 10) el("text", { x: x(r) - 6, y: H - 6 }, ax).textContent = r;
+  for (const team of [...teams].reverse()) {
+    const pts = [[x(0), y(0)]].concat(rounds.filter((r) => r.nodes[team]).map((r) => [x(r.round), y(r.nodes[team].score || 0)]));
+    const isUs = team === s.team;
+    el("polyline", { points: pts.map((p) => p.join(",")).join(" "), fill: "none", stroke: rawOf(team, s.team),
+      "stroke-width": isUs ? 3 : 1.8, filter: isUs ? "url(#glow2)" : "", "stroke-linejoin": "round" }, svg);
+    const last = pts[pts.length - 1];
+    el("text", { x: last[0] + 6, y: last[1] + 4, fill: rawOf(team, s.team), "font-size": 11, "font-family": "monospace", "font-weight": 700 }, svg)
+      .textContent = (rounds.length ? fmt(rounds[rounds.length - 1].nodes[team] && rounds[rounds.length - 1].nodes[team].score, 1) : "");
+  }
+  const defs = el("defs", {}, svg);
+  const f = el("filter", { id: "glow2" }, defs);
+  el("feGaussianBlur", { stdDeviation: 2.5, result: "b" }, f);
+  const m = el("feMerge", {}, f); el("feMergeNode", { in: "b" }, m); el("feMergeNode", { in: "SourceGraphic" }, m);
+}
+
+/* ------------------------------------------------------------ pools ---- */
+function drawPools(s, teams) {
+  const d = s.decision || {};
+  const box = $("pools"); box.innerHTML = "";
+  if (d.final) { drawFinal(s, teams); return; }
+  const bids = Object.assign({}, d.predicted_bids || {});
+  if (d.bid) bids[s.team] = d.bid;
+  const order = teams.filter((t) => bids[t]);
+  for (const [k, col] of POOLS) {
+    const total = order.reduce((a, t) => a + (bids[t][k] || 0), 0) || 1;
+    const cap = d.capacities ? d.capacities[k] : 1;
+    const mine = d.bid ? (d.bid[k] || 0) : 0;
+    const share = (mine / total) * cap;
+    const segs = order.map((t) => {
+      const v = (bids[t][k] || 0) / total;
+      const pct = (v * 100).toFixed(0);
+      return `<div class="seg ${t === s.team ? "us" : ""}" style="flex:0 0 ${v * 100}%;background:${colorOf(t, s.team)}">${v > 0.09 ? (t === s.team ? "us " : "") + pct + "%" : ""}</div>`;
+    }).join("");
+    box.insertAdjacentHTML("beforeend", `
+      <div class="pool">
+        <div class="pool-head"><span><span style="color:${col}">■</span> ${k} · pool ${fmt(cap, 2)}</span><span>we win <b>${fmt(share, 3)}</b></span></div>
+        <div class="bar">${segs}</div>
+      </div>`);
+  }
+  const nap = $("napping"); nap.innerHTML = "";
+  for (const t of teams) {
+    if (t === s.team) continue;
+    const awake = (d.awake || []).includes(t);
+    nap.insertAdjacentHTML("beforeend", `<span class="nap ${awake ? "" : "zz"}" style="color:${colorOf(t, s.team)}">${t.replace(/^bot-/, "")} ${awake ? "awake" : "asleep zZ"}</span>`);
+  }
+  $("d-energy").textContent = d.energy_fraction !== undefined ? (100 * d.energy_fraction).toFixed(1) + "%" : "-";
+  $("d-util").textContent = fmt(d.expected_utility, 3);
+  $("d-drain").textContent = fmt(d.drain, 3);
+  $("field-tag").textContent = d.round ? `round ${d.round} · budget ${fmt(d.budget, 3)}` : "";
+  $("why").innerHTML = explain(s, d);
+}
+
+function drawFinal(s, teams) {
+  const rows = s.leaderboard || [];
+  const me = rows.find((r) => r.team === s.team) || {};
+  const bots = rows.filter((r) => r.team !== s.team);
+  const box = $("pools");
+  const max = Math.max(1, ...rows.map((r) => r.score || 0));
+  box.innerHTML = rows.map((r) => `
+    <div class="pool">
+      <div class="pool-head"><span style="color:${colorOf(r.team, s.team)}">${short(r.team, s.team)}</span><b>${fmt(r.score, 2)}</b></div>
+      <div class="bar"><div class="seg ${r.team === s.team ? "us" : ""}" style="flex:0 0 ${(100 * r.score) / max}%;background:${colorOf(r.team, s.team)}"></div></div>
+    </div>`).join("");
+  $("napping").innerHTML = "";
+  $("d-energy").textContent = "-"; $("d-util").textContent = "-"; $("d-drain").textContent = "-";
+  $("field-tag").textContent = "run complete";
+  const best = bots.reduce((a, r) => Math.max(a, r.score || 0), 0);
+  const lead = best ? 100 * ((me.score || 0) / best - 1) : 0;
+  const idle = bots.map((r) => r.rounds_idle);
+  $("why").innerHTML = `<b>Run complete.</b> ${fmt(me.score, 2)} against a best bot of ${fmt(best, 2)}: `
+    + `<b>${lead >= 0 ? "+" : ""}${lead.toFixed(1)}%</b>. We rested ${me.rounds_idle} rounds, by plan; `
+    + `the bots rested ${idle.join(", ")}, by accident.`;
+}
+
+function explain(s, d) {
+  if (!d.round) return "Waiting for the first decision.";
+  const awake = (d.awake || []).length;
+  const bots = teamsOf(s).filter((t) => t !== s.team).length;
+  const ef = 100 * (d.energy_fraction || 0);
+  const parts = [];
+  if (bots && awake === 0) parts.push(`<b>Every opponent is asleep.</b> Any bid takes the whole pool, so we spend almost nothing and win everything.`);
+  else if (bots && awake < bots) parts.push(`<b>${bots - awake} of ${bots} opponents are resting</b>, so the pools are thin and cheap this round.`);
+  else if (bots) parts.push(`All ${bots} opponents are awake: a crowded round.`);
+  if (ef < 0.5) parts.push(`We buy <b>no energy</b>: charge is worth more later than now.`);
+  else if ((d.x_energy || 0) > 0.3) parts.push(`We take a <b>large energy share</b> (x<sub>E</sub> = ${fmt(d.x_energy, 2)}) because the plan has a rest coming anyway.`);
+  else parts.push(`We sip energy (x<sub>E</sub> = ${fmt(d.x_energy, 3)}): the first sliver is the cheapest utility there is.`);
+  const rest = (d.plan_actions || []).indexOf(-1);
+  if (rest > 0) parts.push(`Next planned rest: round ${d.round + rest}.`);
+  else if (d.plan_actions && d.plan_actions.length > 1) parts.push(`No rest planned before the end.`);
+  return parts.join(" ");
+}
+
+/* ------------------------------------------------------------ board ---- */
+function drawBoard(s) {
+  const rows = s.leaderboard || [];
+  const max = Math.max(1, ...rows.map((r) => r.score || 0));
+  $("board").innerHTML = rows.map((r) => {
+    const us = r.team === s.team;
+    const col = colorOf(r.team, s.team);
+    const b = Math.max(0, Math.min(1, r.battery || 0));
+    const bcol = b <= 0.05 ? "var(--bad)" : b < 0.25 ? "var(--naive)" : "var(--good)";
+    return `<tr class="${us ? "us" : ""}">
+      <td>${r.rank}</td>
+      <td class="team" style="color:${col}">${short(r.team, s.team)}<div class="scorebar"><div style="width:${(100 * (r.score || 0)) / max}%;background:${col}"></div></div></td>
+      <td>${fmt(r.score, 2)}</td><td>${r.rounds_idle}</td><td>${r.floor_violations}</td>
+      <td><span class="batt"><div style="width:${b * 44}px;background:${bcol}"></div></span>${fmt(b, 2)}</td></tr>`;
+  }).join("");
+}
+
+/* ------------------------------------------------------------- kpis ---- */
+function drawKpis(s) {
+  const st = s.status || {}, d = s.decision || {};
+  const rows = s.leaderboard || [];
+  const me = rows.find((r) => r.team === s.team) || {};
+  const bots = rows.filter((r) => r.team !== s.team);
+  const best = bots.reduce((a, r) => (r.score > (a ? a.score : -1) ? r : a), null);
+  const total = st.total_rounds || 0;
+  const rnd = d.round || st.round || 0;
+  $("round").innerHTML = total && rnd > total ? `FINAL <small>/ ${total} rounds</small>` : `R ${rnd} <small>/ ${total}</small>`;
+  $("prog").style.width = total ? (100 * Math.min(rnd, total)) / total + "%" : "0";
+  $("team").textContent = s.team || "-";
+  $("scenario").textContent = st.scenario || "-";
+  $("model").textContent = d.model === "shadow" ? `exact (err ${(100 * (d.model_error || 0)).toFixed(2)}%)` : (d.model || "-");
+  $("think").textContent = d.think_ms !== undefined ? `${fmt(d.think_ms, 0)} ms` : "-";
+  $("k-score").textContent = fmt(me.score, 2);
+  $("k-rank").textContent = me.rank ? `rank ${me.rank} of ${rows.length}` : "rank -";
+  if (best && best.score > 0) {
+    const lead = 100 * ((me.score || 0) / best.score - 1);
+    $("k-lead").textContent = (lead >= 0 ? "+" : "") + lead.toFixed(1) + "%";
+    $("k-lead").className = "value " + (lead >= 0 ? "good" : "bad");
+    $("k-best").textContent = `best bot: ${best.team.replace(/^bot-/, "")} ${fmt(best.score, 2)}`;
+  }
+  $("k-idle").textContent = me.rounds_idle !== undefined ? me.rounds_idle : "0";
+  $("k-idle-bots").textContent = "bots: " + bots.map((r) => r.rounds_idle).join(" / ");
+  $("k-floors").textContent = me.floor_violations !== undefined ? me.floor_violations : "0";
+  $("k-floors").className = "value " + ((me.floor_violations || 0) === 0 ? "good" : "bad");
+  $("k-shadow").textContent = fmt(d.shadow_price, 2);
+  const lsw = (st.lsw_series || []).slice(-1)[0];
+  $("k-lsw").textContent = fmt(lsw, 2);
+}
+
+/* ------------------------------------------------------------- loop ---- */
+function render(s) {
+  const teams = teamsOf(s);
+  drawKpis(s); drawBattery(s, teams); drawNaps(s, teams); drawRace(s, teams); drawPools(s, teams); drawBoard(s);
+}
+
+async function tick() {
+  try {
+    const r = await fetch("api/state", { cache: "no-store" });
+    const s = await r.json();
+    lastOk = Date.now();
+    if ((s.rounds && s.rounds.length) || (s.decision && s.decision.round)) $("waiting").classList.add("hidden");
+    render(s);
+    $("updated").textContent = "updated " + new Date().toLocaleTimeString();
+  } catch (e) { /* the agent may be restarting; keep polling */ }
+  $("live").classList.toggle("off", Date.now() - lastOk > 3000);
+  setTimeout(tick, 400);
+}
+tick();
+</script>
+</body>
+</html>
